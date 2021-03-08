@@ -13,7 +13,7 @@ char buffer[BUFSIZ];
 enum worktype{WLISTEN = 1, WWRITE};
 
 
-class worker{
+class worker: noncopyable{
 	public:
 		worker(int file, worktype type, void(*raction)(char*,int, int), epoll* tree)
 			: fd(file), wt((worktype)type), readAction(raction), ev(tree, file, (void*)this){

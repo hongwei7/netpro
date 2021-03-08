@@ -48,17 +48,19 @@ class server {
 				int ret = epoll_wait(epolltree.getepfd(), epolltree.eventsList, MAX_CLIENTS, -1);
 				assert(ret > 0);
 				for(int i = 0; i < ret; ++i){
+					dbg("deal with event");
+					dbg(ret);
 					worker* ptr = (worker*)epolltree.eventsList[i].data.ptr;
 					dbg(ptr->getfd() == sockfd);
 					if(ptr->getfd() == sockfd) newClient();
 					else{
 						int excuteRes = ptr->workerRead();
 						if(excuteRes == 0){ //close
-							close(ptr->getfd());
 							workersListMutex.lock();
 							workersList.remove(ptr);
-							delete ptr;
 							workersListMutex.unlock();
+							close(ptr->getfd());
+							delete ptr;
 						}
 					}
 				}
@@ -72,7 +74,6 @@ class server {
 			assert(clifd > 0);
 			workersListMutex.lock();
 			workersList.push_back(new worker(clifd, WLISTEN, readAction, &epolltree));
-			event ev(&epolltree, clifd, &(workersList.back()));
 			workersListMutex.unlock();
 		}
 
