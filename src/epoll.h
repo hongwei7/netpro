@@ -4,43 +4,50 @@
 #include <sys/epoll.h>
 #include <assert.h>
 #include <string.h>
+#include "dbg.h"
 #include "noncopyable.h"
 
 const int EPOLL_INIT_SIZE = 5;
 const int MAX_CLIENTS = 60000;
 
-class epoll: noncopyable{
+class epoll: public noncopyable{
 public:
     epoll(): epfd(epoll_create(EPOLL_INIT_SIZE)){
         assert(epfd > 0);
     };
-    const int getfd(){return epfd;}
+    int getepfd() const {return epfd;}
     struct epoll_event eventsList[MAX_CLIENTS];
+    virtual ~epoll(){
+        close(epfd);
+    }
 private:
     int epfd;
 };
 
-class event: noncopyable{
+class event{
 public:
-    event() = delete;
-    explicit event(epoll* ep, int cli, void*(*worker)(void*))
+    event(epoll* ep, int cli, void* wk)
     :epollTree(ep), cliFd(cli){
-        event_impl.data.ptr = (void*) worker;
-        epoll_ctl(epollTree->getfd(), EPOLL_CTL_ADD, cliFd, &event_impl);
+        event_impl.events = EPOLLIN;
+        event_impl.data.ptr = (void*) wk;
+        dbg(epollTree->getepfd(), cliFd);
+        int ret = epoll_ctl(epollTree->getepfd(), EPOLL_CTL_ADD, cliFd, &event_impl);
+        assert(ret == 0);
     }
     void hangRD(){
         event_impl.events = EPOLLIN;
-        int ret = epoll_ctl(epollTree->getfd(), EPOLL_CTL_MOD, cliFd, &event_impl);
+        int ret = epoll_ctl(epollTree->getepfd(), EPOLL_CTL_MOD, cliFd, &event_impl);
+        if(ret == -1)perror("hangRD");
         assert(ret == 0);
     }
     void hangWR(){
         event_impl.events = EPOLLOUT;
-        int ret = epoll_ctl(epollTree->getfd(), EPOLL_CTL_MOD, cliFd, &event_impl);
+        int ret = epoll_ctl(epollTree->getepfd(), EPOLL_CTL_MOD, cliFd, &event_impl);
         assert(ret == 0);
     }
     const int getfd() const{ return cliFd;}
     virtual ~event(){
-        int ret = epoll_ctl(epollTree->getfd(), EPOLL_CTL_DEL, cliFd, &event_impl);
+        int ret = epoll_ctl(epollTree->getepfd(), EPOLL_CTL_DEL, cliFd, &event_impl);
         assert(ret == 0);
     }
 
