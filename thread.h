@@ -9,7 +9,6 @@ class thread: public noncopyable{
 public:
     thread(void*(*routine)(void*), void* args){
         assert(pthread_create(&pid, nullptr, routine, args) == 0);
-        assert(pthread_detach(pid));
     }
     virtual ~thread(){
         pthread_exit(nullptr);

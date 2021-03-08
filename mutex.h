@@ -21,6 +21,7 @@ public:
     void unlock(){
         assert(pthread_mutex_unlock(&mutex_) == 0);
     }
+    pthread_mutex_t* getlock(){return &mutex_;}
     virtual ~mutex(){
         pthread_mutex_destroy(&mutex_);
     }
