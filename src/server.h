@@ -48,9 +48,8 @@ class server {
 				int ret = epoll_wait(epolltree.getepfd(), epolltree.eventsList, MAX_CLIENTS, -1);
 				assert(ret > 0);
 				for(int i = 0; i < ret; ++i){
-					worker* ptr = (worker*)&epolltree.eventsList[i].data.ptr;
-					dbg(ptr->getfd());
-					dbg(sockfd);
+					worker* ptr = (worker*)epolltree.eventsList[i].data.ptr;
+					dbg(ptr->getfd() == sockfd);
 					if(ptr->getfd() == sockfd) newClient();
 					else{
 						int excuteRes = ptr->workerRead();
