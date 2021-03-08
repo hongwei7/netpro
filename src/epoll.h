@@ -28,9 +28,10 @@ class event{
 public:
     event(epoll* ep, int cli, void* wk)
     :epollTree(ep), cliFd(cli){
+	dbg("create event");
+	dbg(cliFd);
         event_impl.events = EPOLLIN;
         event_impl.data.ptr = (void*) wk;
-        dbg(epollTree->getepfd(), cliFd);
         int ret = epoll_ctl(epollTree->getepfd(), EPOLL_CTL_ADD, cliFd, &event_impl);
         assert(ret == 0);
     }

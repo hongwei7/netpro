@@ -10,6 +10,6 @@ void echo(char* buf, int size){
 }
 
 int main(){
-    server ser(SERVPORT);
+    server ser(SERVPORT, nullptr);
     ser.mainloop();
 }

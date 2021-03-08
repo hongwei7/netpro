@@ -16,72 +16,82 @@
 #include "mutex.h"
 #include <list>
 
+void defaultRead(char* buf, int size, int fd){
+	dbg(buf);
+}
 class server {
-public:
-    server(int port) 
-    : sockfd(socket(AF_INET, SOCK_STREAM, 0)){
-        assert(sockfd != 0);
-        dbg(sockfd);
-        dbg(epolltree.getepfd());
-        memset(&servAddr, 0, sizeof(servAddr));
-        memset(&cliAddr, 0, sizeof(cliAddr));
-        servAddr.sin_family = AF_INET;
-        servAddr.sin_port = htons(port);
-        servAddr.sin_addr.s_addr = htonl(INADDR_ANY);
-        int opt = 1;
-        setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-        assert(bind(sockfd, (sockaddr*)&servAddr, sizeof(servAddr)) == 0);
-        assert(listen(sockfd, 128) == 0);
-        workersListMutex.lock();
-        workersList.push_back(new worker(sockfd, WLISTEN, nullptr, &epolltree));
-        workersListMutex.unlock();
-    }
-    void mainloop(){
-        while(true){
+	public:
+		server(int port, void(*raction)(char*, int, int)) 
+			: sockfd(socket(AF_INET, SOCK_STREAM, 0)), readAction(raction){
+				if(readAction == nullptr)readAction = defaultRead;
+				assert(sockfd != 0);
+				dbg(sockfd);
+				dbg(epolltree.getepfd());
+				memset(&servAddr, 0, sizeof(servAddr));
+				memset(&cliAddr, 0, sizeof(cliAddr));
+				servAddr.sin_family = AF_INET;
+				servAddr.sin_port = htons(port);
+				servAddr.sin_addr.s_addr = htonl(INADDR_ANY);
+				int opt = 1;
+				setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+				assert(bind(sockfd, (sockaddr*)&servAddr, sizeof(servAddr)) == 0);
+				assert(listen(sockfd, 128) == 0);
+				workersListMutex.lock();
+				workersList.push_back(new worker(sockfd, WLISTEN, nullptr, &epolltree));
+				workersListMutex.unlock();
+			}
+		void mainloop(){
+			while(true){
 
-            dbg(epolltree.getepfd(), sockfd);
-            
-            int ret = epoll_wait(epolltree.getepfd(), epolltree.eventsList, MAX_CLIENTS, -1);
-            assert(ret > 0);
-            dbg(ret);
-            for(int i = 0; i < ret; ++i){
-                worker* ptr = (worker*)&epolltree.eventsList[i].data.ptr;
-                if(ptr == nullptr) newClient();
-                else if(ptr->workerRead() == 0){ //close
-                    close(ptr->getfd());
-                    workersListMutex.lock();
-                    workersList.remove(ptr);
-                    delete ptr;
-                    workersListMutex.unlock();
-                }
-            }
-        }
-    }
-    void newClient(){
-        socklen_t socksize = sizeof(cliAddr);
-        int clifd = accept(sockfd, (sockaddr*)&cliAddr, &socksize);
-        assert(clifd > 0);
-        workersListMutex.lock();
-        workersList.push_back(new worker(clifd, WLISTEN, readAction, &epolltree));
-        event ev(&epolltree, clifd, &(workersList.back()));
-        workersListMutex.unlock();
-    }
+				dbg("epoll wait");
 
-    virtual ~server(){
-        workersListMutex.lock();
-        for(auto & cli: workersList){
-            close(cli->getfd());
-        }   
-        workersListMutex.unlock();
-    }
+				int ret = epoll_wait(epolltree.getepfd(), epolltree.eventsList, MAX_CLIENTS, -1);
+				assert(ret > 0);
+				for(int i = 0; i < ret; ++i){
+					worker* ptr = (worker*)&epolltree.eventsList[i].data.ptr;
+					dbg(ptr->getfd());
+					dbg(sockfd);
+					if(ptr->getfd() == sockfd) newClient();
+					else{
+						int excuteRes = ptr->workerRead();
+						if(excuteRes == 0){ //close
+							close(ptr->getfd());
+							workersListMutex.lock();
+							workersList.remove(ptr);
+							delete ptr;
+							workersListMutex.unlock();
+						}
+					}
+				}
+			}
+		}
+		void newClient(){
+			dbg("newClient");
+			socklen_t socksize = sizeof(cliAddr);
+			int clifd = accept(sockfd, (sockaddr*)&cliAddr, &socksize);
+			dbg(clifd);
+			assert(clifd > 0);
+			workersListMutex.lock();
+			workersList.push_back(new worker(clifd, WLISTEN, readAction, &epolltree));
+			event ev(&epolltree, clifd, &(workersList.back()));
+			workersListMutex.unlock();
+		}
 
-private:
-    int sockfd;
-    struct sockaddr_in servAddr, cliAddr;
-    epoll epolltree;
-    void(*readAction)(char*, int, int);
-    std::list<worker*> workersList;
-    mutex workersListMutex;
+		virtual ~server(){
+			workersListMutex.lock();
+			for(auto & cli: workersList){
+				close(cli->getfd());
+			}   
+			workersListMutex.unlock();
+		}
+
+	private:
+		int sockfd;
+		struct sockaddr_in servAddr, cliAddr;
+		epoll epolltree;
+		void(*readAction)(char*, int, int);
+		std::list<worker*> workersList;
+		mutex workersListMutex;
 };
 
 #endif
