@@ -1,5 +1,5 @@
 #ifndef __NETPRO__MUTEX__H
-#define __NETPRE_MUTEX__H
+#define __NETPRO__MUTEX__H
 
 #include<pthread.h>
 #include<assert.h>
