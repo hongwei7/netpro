@@ -2,25 +2,26 @@
 #define __NETPRO__TCPCONN__H
 
 #include <stdio.h>
+#include <list>
 #include <unistd.h>
 #include <errno.h>
 #include <stdlib.h>
 #include "epoll.h"
 #include "dbg.h"
+#include <memory>
 
-char buffer[BUFSIZ];
+void* dealWithClient(void*);
 
 class tcpconn : noncopyable {
 public:
-	tcpconn(int file, void(*raction)(char*, int, tcpconn*), epoll* tree)
-		: fd(file), readAction(raction), ev(tree, file, (void*)this) {
-		dbg("tcpconn created");
-	};
+	tcpconn(int file, void(*raction)(char*, int, tcpconn*), epoll* tree, std::list<tcpconn*>* li, mutex* litx)
+		: fd(file), readAction(raction), ev(tree, file, (void*)this), tcplist(li), tcplistMutex(litx){};
 
 	int tcpconnRead() {
+		char buffer[BUFSIZ];
 		while (1) {
 			memset(buffer, 0, sizeof(buffer));
-			dbg("enter read loop");
+			// dbg("enter read loop");
 			int readSize = read(fd, buffer, sizeof(buffer));
 			dbg(readSize);
 			if (readSize > 0) {
@@ -34,10 +35,24 @@ public:
 			}
 			else {
 				perror("read");
-				exit(-1);
+				return -1;
 			}
 		}
 	}
+	friend void* dealWithClient(void* cli) {
+		tcpconn* cliTcp = static_cast<tcpconn*>(cli);
+		if (cliTcp->ev.getEvent() & EPOLLIN) {
+			if (cliTcp->tcpconnRead() == 0) {
+				dbg("client exiting");
+				mutex* lock = cliTcp->tcplistMutex;
+				lock->lock();
+				cliTcp->tcplist->remove(cliTcp);
+				delete cliTcp;
+				lock->unlock();
+			}
+		}
+	}
+
 	const int getfd() const { return fd; }
 	const int operator*() const { return getfd(); }
 	bool operator==(const tcpconn& other) {
@@ -53,6 +68,8 @@ private:
 	void (*readAction)(char* buf, int size, tcpconn* wk);
 	void (*writeAction)(char* buf, int size, tcpconn* wk);
 	event ev;
+	std::list<tcpconn*>* tcplist;
+	mutex* tcplistMutex;
 };
 
 

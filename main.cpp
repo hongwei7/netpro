@@ -3,7 +3,6 @@
 #include<stdlib.h>
 #include <iostream>
 #include"server.h"
-#include "threadPool.h"
 
 const int SERVPORT = 9999;
 void echo(char* buf, int size, tcpconn* wk) {
@@ -20,13 +19,6 @@ void* test(void* arg){
 }
 
 int main() {
-    threadPool pool(2, 1000, 20);
-    for(int i = 0; i < 10000; ++i){
-        pool.threadPoolAdd(test, nullptr);
-    }
-    sleep(20);
-    // dbg(iii);
-    exit(0);
-    // server ser(SERVPORT, echo);
-    // ser.mainloop();
+    server ser(SERVPORT, echo);
+    ser.mainloop();
 }
