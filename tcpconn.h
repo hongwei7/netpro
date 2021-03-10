@@ -15,8 +15,11 @@ void closeTcpconn(void*);
 
 class tcpconn : noncopyable {
 public:
-	tcpconn(int file, void(*raction)(char*, int, tcpconn*), char*(*waction)(int*, tcpconn*), epoll* tree, std::list<tcpconn*>* li, mutex* litx)
-		: fd(file), readAction(raction), writeAction(waction),ev(tree, file, (void*)this), tcplist(li), tcplistMutex(litx), closing(false){} 
+	tcpconn(int file, void(*raction)(char*, int, tcpconn*), char*(*waction)(int*, tcpconn*), 
+		epoll* tree, std::list<tcpconn*>* li, mutex* litx)
+	: fd(file), readAction(raction), writeAction(waction),
+	ev(tree, file, (void*)this), tcplist(li), tcplistMutex(litx), closing(false)
+	{} 
 
 	int tcpconnRead() {
 		char buffer[BUFSIZ];
@@ -63,7 +66,10 @@ public:
 			int ret = cliTcp->tcpconnWrite();
 			assert(ret == 0);
 		}
-		if(cliTcp->closing)closeTcpconn(cli);
+		if(cliTcp->closing){
+			closeTcpconn(cli);
+			return NULL;
+		}
 		cliTcp->tcpLock.unlock();
 	}
 
