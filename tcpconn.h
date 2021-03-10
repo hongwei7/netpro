@@ -68,6 +68,7 @@ public:
 			assert(ret == 0);
 		}
 		cliTcp->tcpLock.unlock();
+		close(cliTcp->fd);
 	}
 
 	const int getfd() const { return fd; }
@@ -84,7 +85,6 @@ public:
 
 	~tcpconn() {
 		ev.destroy();
-		close(fd);
 	}
 
 public:

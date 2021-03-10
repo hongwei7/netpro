@@ -81,8 +81,8 @@ public:
                     tcpconnsListMutex.lock();
                     auto iter = tcpconnsList.find(ptr->getfd());
                     assert(iter != tcpconnsList.end());
-	            tcpconnsListMutex.unlock();
 		    if(ptr->closing)continue;
+	            tcpconnsListMutex.unlock();
                     pool.threadPoolAdd(dealWithClient,(void*)ptr);
                 }
             }
@@ -95,7 +95,7 @@ public:
         setNonBlock(clifd);
         tcpconnsListMutex.lock();
         auto iter = tcpconnsList.find(clifd);
-        assert(iter == tcpconnsList.end());
+        //assert(iter == tcpconnsList.end());
         tcpconnsList[clifd] = new tcpconn(clifd, readAction, writeAction, &epolltree);
         dbg(tcpconnsList.size());
         tcpconnsListMutex.unlock();
