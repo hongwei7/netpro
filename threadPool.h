@@ -7,7 +7,7 @@
 #include "mutex.h"
 #include "cond.h"
 
-const unsigned int SLEEP_AND_MANAGE_SECS = 1;         //每隔多少秒管理一次线程池
+const unsigned int SLEEP_AND_MANAGE_SECS = 5;         //每隔多少秒管理一次线程池
 const int MIN_WAIT_THREAD_NUM = 5;                    //当等待的任务数大于该阈值，增加线程
 const int DEFAULT_THREAD_VARY = 10;                   //每次改变的线程数
 
@@ -69,15 +69,16 @@ public:
             pool->queueNotFull.boardcast();
             pool->locker.unlock();
 
-            //执行任务
+            // 执行任务
             pool->threadlocker.lock();
             pool->busyThreadNum++;
             pool->threadlocker.unlock();
             // dbg("task running...");
+            // dbg(pthread_self());
             task.run();
 
-            //任务处理结束
-            // dbg("task finished");
+            // 任务处理结束
+            dbg("task finished");
             pool->threadlocker.lock();
             pool->busyThreadNum--;
             // dbg(pool->queueFront, pool->queueBack, pool->queueSize);
@@ -98,6 +99,7 @@ public:
 
             pool->threadlocker.lock();
             int busyThreadNum = pool->busyThreadNum;
+            dbg(busyThreadNum);
             pool->threadlocker.unlock();
 
             if (queueSize >= MIN_WAIT_THREAD_NUM && liveThreadNum < pool->maxThreadNum) {   //创建新线程
@@ -108,8 +110,8 @@ public:
                     assert(ret == 0);
                 }
                 pool->liveThreadNum += i;
-                // dbg("线程增加");
-                // dbg(pool->liveThreadNum);
+                dbg("线程增加");
+                dbg(pool->liveThreadNum);
                 pool->locker.unlock();
             }
 

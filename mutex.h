@@ -15,8 +15,14 @@ public:
         assert(pthread_mutex_lock(&mutex_) == 0);
     }
     int trylock(){
-        if( pthread_mutex_trylock(&mutex_) == EAGAIN)return 0;
-        return 1; //success lock
+        int ret = pthread_mutex_trylock(&mutex_);
+        if( ret == 0)return 0;               //success lock
+        else if(ret == EBUSY) return 1;      //未可用
+        else if(ret == EINVAL) return -1;    //失效
+        else { 
+            dbg(ret);
+            abort();
+        }
     }
     void unlock(){
         assert(pthread_mutex_unlock(&mutex_) == 0);

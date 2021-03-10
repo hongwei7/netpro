@@ -2,7 +2,7 @@
 #define __NETPRE__SERVER__H
 
 #include<sys/socket.h>
-#include <list>
+#include <map>
 #include<assert.h>
 #include<sys/types.h>
 #include<fcntl.h>
@@ -16,16 +16,16 @@
 #include "epoll.h"
 #include "dbg.h"
 
-const int DEFAULT_POOL_MIN = 3;
+const int DEFAULT_POOL_MIN = 10;
 const int DEFAULT_POOL_MAX = 1000;
-const int DEFAULT_TASK_NUM = 20;
+const int DEFAULT_TASK_NUM = 50;
 
 void defaultRead(char* buf, int size, tcpconn* wk) {
     dbg(buf);
 }
 char* defaultWrite(int* size, tcpconn* wk) {
     dbg("default write back function");
-    wk->ListenRead();
+    wk->setReadOnly();
     return nullptr;
 }
 int setNonBlock(int sock) {
@@ -64,12 +64,12 @@ public:
         assert(bind(sockfd, (sockaddr*)&servAddr, sizeof(servAddr)) == 0);
         assert(listen(sockfd, 128) == 0);
         tcpconnsListMutex.lock();
-        tcpconnsList.push_back(new tcpconn(sockfd, nullptr, nullptr, &epolltree, nullptr, nullptr));
+        tcpconnsList[sockfd] =  new tcpconn(sockfd, nullptr, nullptr, &epolltree);
         tcpconnsListMutex.unlock();
     }
     void mainloop() {
         while (true) {
-            dbg("epoll wait");
+            // dbg("epoll wait");
 
             int ret = epoll_wait(epolltree.getepfd(), epolltree.eventsList, MAX_CLIENTS, -1);
             assert(ret > 0);
@@ -78,20 +78,37 @@ public:
                 tcpconn* ptr = (tcpconn*)epolltree.eventsList[i].data.ptr;
                 if (ptr->getfd() == sockfd) newClient();
                 else {
-                    pool.threadPoolAdd(dealWithClient, (void*)ptr);
-                    //dealWithClient((void*)(ptr));
+                    tcpconnsListMutex.lock();
+                    auto iter = tcpconnsList.find(ptr->getfd());
+                    assert(iter != tcpconnsList.end());
+                    tcpconnsList[ptr->getfd()]->tcpLock.lock();
+                    tcpconnsList[ptr->getfd()]->count++;
+                    tcpconnsList[ptr->getfd()]->tcpLock.unlock();
+                    tcpconnsListMutex.unlock();
+                    dealWithClient((void*)ptr);
+                    dbg("OUT");
+                    tcpconnsListMutex.lock();
+                    tcpconnsList[ptr->getfd()]->tcpLock.lock();
+                    if(--tcpconnsList[ptr->getfd()]->count == 0){
+                        delete tcpconnsList[ptr->getfd()];
+                        tcpconnsList.erase(ptr->getfd());
+                    }
+                    tcpconnsList[ptr->getfd()]->tcpLock.unlock();
+                    tcpconnsListMutex.unlock();
                 }
             }
         }
     }
     void newClient() {
-        dbg("newClient");
         socklen_t socksize = sizeof(cliAddr);
         int clifd = accept(sockfd, (sockaddr*)&cliAddr, &socksize);
         assert(clifd > 0);
         setNonBlock(clifd);
         tcpconnsListMutex.lock();
-        tcpconnsList.push_back(new tcpconn(clifd, readAction, writeAction, &epolltree, &tcpconnsList, &tcpconnsListMutex));
+        auto iter = tcpconnsList.find(clifd);
+        assert(iter == tcpconnsList.end());
+        tcpconnsList[clifd] = new tcpconn(clifd, readAction, writeAction, &epolltree);
+        dbg(tcpconnsList.size());
         tcpconnsListMutex.unlock();
     }
 
@@ -100,8 +117,9 @@ public:
     virtual ~server() {
         tcpconnsListMutex.lock();
         for (auto& cli : tcpconnsList) {
-            delete cli;
+            delete cli.second;
         }
+        tcpconnsList.clear();
         tcpconnsListMutex.unlock();
     }
 
@@ -111,7 +129,7 @@ private:
     epoll epolltree;
     void(*readAction)(char*, int, tcpconn*);
     char*(*writeAction)(int*, tcpconn*);
-    std::list<tcpconn*> tcpconnsList;
+    std::map<int, tcpconn*> tcpconnsList;
     mutex tcpconnsListMutex;
     threadPool pool;
 };
