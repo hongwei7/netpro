@@ -20,7 +20,7 @@ public:
 	tcpconn(int file, void(*raction)(char*, int, tcpconn*), char*(*waction)(int*, tcpconn*), 
 	epoll* tree)
 	: fd(file), readAction(raction), writeAction(waction),
-	ev(tree, file, (void*)this), closing(false), count(0)
+	ev(tree, file, (void*)this), closing(false)
 	{} 
 
 	int tcpconnRead() {
@@ -89,14 +89,13 @@ public:
 
 public:
 	mutex tcpLock;
-	int count;
+	bool closing;
 
 private:
 	int fd;
 	void (*readAction)(char* buf, int size, tcpconn* wk);
 	char* (*writeAction)(int* size, tcpconn* wk);
 	event ev;
-	bool closing;
 };
 
 

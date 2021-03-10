@@ -69,7 +69,7 @@ public:
     }
     void mainloop() {
         while (true) {
-            // dbg("epoll wait");
+            dbg("epoll wait");
 
             int ret = epoll_wait(epolltree.getepfd(), epolltree.eventsList, MAX_CLIENTS, -1);
             assert(ret > 0);
@@ -81,20 +81,9 @@ public:
                     tcpconnsListMutex.lock();
                     auto iter = tcpconnsList.find(ptr->getfd());
                     assert(iter != tcpconnsList.end());
-                    tcpconnsList[ptr->getfd()]->tcpLock.lock();
-                    tcpconnsList[ptr->getfd()]->count++;
-                    tcpconnsList[ptr->getfd()]->tcpLock.unlock();
-                    tcpconnsListMutex.unlock();
-                    dealWithClient((void*)ptr);
-                    dbg("OUT");
-                    tcpconnsListMutex.lock();
-                    tcpconnsList[ptr->getfd()]->tcpLock.lock();
-                    if(--tcpconnsList[ptr->getfd()]->count == 0){
-                        delete tcpconnsList[ptr->getfd()];
-                        tcpconnsList.erase(ptr->getfd());
-                    }
-                    tcpconnsList[ptr->getfd()]->tcpLock.unlock();
-                    tcpconnsListMutex.unlock();
+	            tcpconnsListMutex.unlock();
+		    if(ptr->closing)continue;
+                    pool.threadPoolAdd(dealWithClient,(void*)ptr);
                 }
             }
         }
