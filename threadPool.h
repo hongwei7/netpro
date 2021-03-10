@@ -135,6 +135,7 @@ public:
             queueNotFull.wait();    //等待队列有位置
         }
         if (shutdown)locker.unlock();
+        // dbg("NEW THREAD");
         threadPoolTask* newTask = new threadPoolTask(function, arg);
         assert(taskQueue[queueFront] == nullptr);
         taskQueue[queueFront] = newTask;

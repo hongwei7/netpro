@@ -11,11 +11,12 @@
 #include <memory>
 
 void* dealWithClient(void*);
+void closeTcpconn(void*);
 
 class tcpconn : noncopyable {
 public:
-	tcpconn(int file, void(*raction)(char*, int, tcpconn*), epoll* tree, std::list<tcpconn*>* li, mutex* litx)
-		: fd(file), readAction(raction), ev(tree, file, (void*)this), tcplist(li), tcplistMutex(litx){};
+	tcpconn(int file, void(*raction)(char*, int, tcpconn*), char*(*waction)(int*, tcpconn*), epoll* tree, std::list<tcpconn*>* li, mutex* litx)
+		: fd(file), readAction(raction), writeAction(waction),ev(tree, file, (void*)this), tcplist(li), tcplistMutex(litx), closing(false){} 
 
 	int tcpconnRead() {
 		char buffer[BUFSIZ];
@@ -39,24 +40,55 @@ public:
 			}
 		}
 	}
+
+	int tcpconnWrite() {
+		int size = 0;
+		char* writeBuffer =  writeAction(&size, this);
+		int writeSize = write(fd, writeBuffer, size); 
+		assert(writeSize >= 0);
+		return 0;
+	}
+
 	friend void* dealWithClient(void* cli) {
 		tcpconn* cliTcp = static_cast<tcpconn*>(cli);
+		cliTcp->tcpLock.lock();
+		if(cliTcp->closing)return NULL;
 		if (cliTcp->ev.getEvent() & EPOLLIN) {
 			if (cliTcp->tcpconnRead() == 0) {
-				dbg("client exiting");
-				mutex* lock = cliTcp->tcplistMutex;
-				lock->lock();
-				cliTcp->tcplist->remove(cliTcp);
-				delete cliTcp;
-				lock->unlock();
+				closeTcpconn(cliTcp);
+				return NULL;
 			}
 		}
+		if(cliTcp->ev.getEvent() & EPOLLOUT) {
+			int ret = cliTcp->tcpconnWrite();
+			assert(ret == 0);
+		}
+		if(cliTcp->closing)closeTcpconn(cli);
+		cliTcp->tcpLock.unlock();
 	}
 
 	const int getfd() const { return fd; }
 	const int operator*() const { return getfd(); }
 	bool operator==(const tcpconn& other) {
 		return this->fd == other.fd;
+	}
+	void ListenRead(){
+		ev.hangRD();
+	}
+	void ListenWrite(){
+		ev.hangWR();
+	}
+	void tryClose(){
+		closing = true;
+	}
+	friend void closeTcpconn(void* cli){
+		dbg("client exiting");
+		tcpconn* cliTcp = (tcpconn*) cli;
+		mutex* lock = cliTcp->tcplistMutex;
+		lock->lock();
+		cliTcp->tcplist->remove(cliTcp);
+		delete cliTcp;
+		lock->unlock();
 	}
 	~tcpconn() {
 		ev.destroy();
@@ -66,10 +98,12 @@ public:
 private:
 	int fd;
 	void (*readAction)(char* buf, int size, tcpconn* wk);
-	void (*writeAction)(char* buf, int size, tcpconn* wk);
+	char* (*writeAction)(int* size, tcpconn* wk);
 	event ev;
 	std::list<tcpconn*>* tcplist;
 	mutex* tcplistMutex;
+	mutex tcpLock;
+	bool closing;
 };
 
 

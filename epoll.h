@@ -11,9 +11,6 @@
 const int EPOLL_INIT_SIZE = 5;
 const int MAX_CLIENTS = 60000;
 
-
-
-
 class epoll : public noncopyable {
 public:
     epoll() : epfd(epoll_create(EPOLL_INIT_SIZE)){
@@ -35,7 +32,7 @@ class event : public noncopyable {
 public:
     event(epoll* ep, int cli, void* wk)
         : epollTree(ep), cliFd(cli){
-        event_impl.events = EPOLLIN;
+        event_impl.events = EPOLLIN; 
         if (ep->getepfd() != cli)event_impl.events |= EPOLLET; //ET模式
         event_impl.data.ptr = (void*)wk;
         int ret = epoll_ctl(epollTree->getepfd(), EPOLL_CTL_ADD, cliFd, &event_impl);
@@ -45,14 +42,14 @@ public:
         }
         assert(ret == 0);
     }
-    void hangRD() {
+    void hangRD() {           //只监听ET读
         event_impl.events = EPOLLIN | EPOLLET;
         int ret = epoll_ctl(epollTree->getepfd(), EPOLL_CTL_MOD, cliFd, &event_impl);
         if (ret == -1)perror("hangRD");
         assert(ret == 0);
     }
-    void hangWR() {
-        event_impl.events = EPOLLOUT;
+    void hangWR() {           //允许写
+        event_impl.events |= EPOLLOUT | EPOLLET;
         int ret = epoll_ctl(epollTree->getepfd(), EPOLL_CTL_MOD, cliFd, &event_impl);
         assert(ret == 0);
     }

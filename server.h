@@ -23,6 +23,11 @@ const int DEFAULT_TASK_NUM = 20;
 void defaultRead(char* buf, int size, tcpconn* wk) {
     dbg(buf);
 }
+char* defaultWrite(int* size, tcpconn* wk) {
+    dbg("default write back function");
+    wk->ListenRead();
+    return nullptr;
+}
 int setNonBlock(int sock) {
     int flags;
     flags = fcntl(sock, F_GETFL, 0);
@@ -35,10 +40,11 @@ int setNonBlock(int sock) {
 
 class server {
 public:
-    server(int port, void(*raction)(char*, int, tcpconn*))
-        : sockfd(socket(AF_INET, SOCK_STREAM, 0)), readAction(raction),
+    server(int port, void(*raction)(char*, int, tcpconn*), char*(*waction)(int*, tcpconn*))
+        : sockfd(socket(AF_INET, SOCK_STREAM, 0)), readAction(raction), writeAction(waction),
         pool(DEFAULT_POOL_MIN, DEFAULT_POOL_MAX, DEFAULT_TASK_NUM) {
         if (readAction == nullptr)readAction = defaultRead;
+        if (writeAction ==nullptr) writeAction = defaultWrite;
         assert(sockfd != 0);
         memset(&servAddr, 0, sizeof(servAddr));
         memset(&cliAddr, 0, sizeof(cliAddr));
@@ -58,7 +64,7 @@ public:
         assert(bind(sockfd, (sockaddr*)&servAddr, sizeof(servAddr)) == 0);
         assert(listen(sockfd, 128) == 0);
         tcpconnsListMutex.lock();
-        tcpconnsList.push_back(new tcpconn(sockfd, nullptr, &epolltree, nullptr, nullptr));
+        tcpconnsList.push_back(new tcpconn(sockfd, nullptr, nullptr, &epolltree, nullptr, nullptr));
         tcpconnsListMutex.unlock();
     }
     void mainloop() {
@@ -85,7 +91,7 @@ public:
         assert(clifd > 0);
         setNonBlock(clifd);
         tcpconnsListMutex.lock();
-        tcpconnsList.push_back(new tcpconn(clifd, readAction, &epolltree, &tcpconnsList, &tcpconnsListMutex));
+        tcpconnsList.push_back(new tcpconn(clifd, readAction, writeAction, &epolltree, &tcpconnsList, &tcpconnsListMutex));
         tcpconnsListMutex.unlock();
     }
 
@@ -104,6 +110,7 @@ private:
     struct sockaddr_in servAddr, cliAddr;
     epoll epolltree;
     void(*readAction)(char*, int, tcpconn*);
+    char*(*writeAction)(int*, tcpconn*);
     std::list<tcpconn*> tcpconnsList;
     mutex tcpconnsListMutex;
     threadPool pool;

@@ -5,20 +5,43 @@
 #include"server.h"
 
 const int SERVPORT = 9999;
-void echo(char* buf, int size, tcpconn* wk) {
+
+char serbuffer[BUFSIZ];
+int writeSize = 0;
+
+void get(char* buf, int size, tcpconn* wk) {
     std::cout << wk->getfd() << " is sending:" << std::endl;
     std::cout << "----output-----" << std::endl;
-    std::cout << buf << std::endl;
+    std::cout << buf ;
     std::cout << "---------------" << std::endl;
+	dbg("writing back:");
+	writeSize = read(STDIN_FILENO, serbuffer, sizeof(serbuffer));
+    wk->ListenWrite();
 }
 
-int iii = 0;
-void* test(void* arg){
-    if(iii++ % 100 == 0) dbg(iii);
-    sleep(1);
+char* answer(int* size, tcpconn* wk){
+    *size = writeSize;
+    wk->ListenRead();
+    wk->tryClose();
+    return serbuffer;
+}
+
+void httpRequest(char* buf, int size, tcpconn* wk){
+    std::cout << "----request-----" << std::endl;
+    std::cout << buf ;
+    std::cout << "---------------" << std::endl;
+    wk->ListenWrite();
+}
+
+char httpres[] = "HTTP/1.1 200 OK\r\nDate: Sat, 31 Dec 2005 23:59:59 GMT\r\nContent-Type: text/html;charset=ISO-8859-1\r\n\r\n<html><head><title>TEST</title></head><body>HELLO</body></html>\n";
+char* httpResponse(int* size, tcpconn* wk){
+    *size = strlen(httpres);
+    wk->ListenRead();
+    wk->tryClose();
+    return httpres;
 }
 
 int main() {
-    server ser(SERVPORT, echo);
+    server ser(SERVPORT, httpRequest, httpResponse);
     ser.mainloop();
 }
