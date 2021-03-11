@@ -32,8 +32,7 @@ class event : public noncopyable {
 public:
     event(epoll* ep, int cli, void* wk)
         : epollTree(ep), cliFd(cli){
-        event_impl.events = EPOLLIN; 
-        if (ep->getepfd() != cli)event_impl.events |= EPOLLET; //ET模式
+        event_impl.events = EPOLLIN | EPOLLOUT | EPOLLET; 
         event_impl.data.ptr = (void*)wk;
         int ret = epoll_ctl(epollTree->getepfd(), EPOLL_CTL_ADD, cliFd, &event_impl);
         if (ret == -1) {
@@ -42,20 +41,11 @@ public:
         }
         assert(ret == 0);
     }
-    void hangRD() {           //只监听ET读
-        event_impl.events = EPOLLIN | EPOLLET;
-        int ret = epoll_ctl(epollTree->getepfd(), EPOLL_CTL_MOD, cliFd, &event_impl);
-        if (ret == -1)perror("hangRD");
-        assert(ret == 0);
-    }
-    void hangWR() {           //允许写
-        event_impl.events |= EPOLLOUT | EPOLLET;
-        int ret = epoll_ctl(epollTree->getepfd(), EPOLL_CTL_MOD, cliFd, &event_impl);
-        assert(ret == 0);
-    }
     const int getfd() const { return cliFd; }
     const int getEvent() const { return event_impl.events; }
     void destroy() {
+        static int destroynum = 0;
+        dbg(destroynum++);
         int ret = epoll_ctl(epollTree->getepfd(), EPOLL_CTL_DEL, cliFd, nullptr);
         if (ret == -1) {
             perror("delete epoll_event");

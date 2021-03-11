@@ -78,7 +78,7 @@ public:
             task.run();
 
             // 任务处理结束
-            dbg("task finished");
+            // dbg("task finished");
             pool->threadlocker.lock();
             pool->busyThreadNum--;
             // dbg(pool->queueFront, pool->queueBack, pool->queueSize);
@@ -95,11 +95,12 @@ public:
             pool->locker.lock();
             int queueSize = pool->queueSize;
             int liveThreadNum = pool->liveThreadNum;
+            // dbg(liveThreadNum);
             pool->locker.unlock();
 
             pool->threadlocker.lock();
             int busyThreadNum = pool->busyThreadNum;
-            dbg(busyThreadNum);
+            // dbg(busyThreadNum);
             pool->threadlocker.unlock();
 
             if (queueSize >= MIN_WAIT_THREAD_NUM && liveThreadNum < pool->maxThreadNum) {   //创建新线程

@@ -18,17 +18,59 @@ int CLIENT_DONE = 0;
 class tcpconn : noncopyable {
 public:
 	tcpconn(int file, void(*raction)(char*, int, tcpconn*), char*(*waction)(int*, tcpconn*), 
-	epoll* tree)
+	epoll* tree, mutex* tlm)
 	: fd(file), readAction(raction), writeAction(waction),
-	ev(tree, file, (void*)this), closing(false)
-	{} 
+	ev(tree, file, (void*)this), closing(false), listMutex(tlm)
+	{
+		static int count = 0;
+		dbg(count++);
+	} 
 
+
+
+	friend void* dealWithClient(void* ev_) {
+
+		epoll_event* cliev = static_cast<epoll_event*>(ev_);
+		tcpconn* cliTcp = static_cast<tcpconn*>(cliev->data.ptr);
+		dbg(cliev->events & EPOLLIN);
+		dbg(cliev->events & EPOLLOUT);
+
+		if (cliev->events & EPOLLIN) {
+			if(cliTcp->closing)return NULL;
+			int ret = cliTcp->tcpconnRead();
+			if(ret == 0){
+				cliTcp->tcpLock.lock();
+				cliTcp->ev.destroy();
+				close(cliTcp->fd);
+				cliTcp->closing = true;
+				cliTcp->tcpLock.unlock();
+				return NULL;
+			}
+			else if(ret == -1)return NULL;
+		}
+
+		if(cliev->events & EPOLLOUT){
+			int ret = cliTcp->tcpconnWrite();
+		}
+
+		return NULL;
+	}
+
+	const int getfd() const { return fd; }
+	const int operator*() const { return getfd(); }
+private:
 	int tcpconnRead() {
 		char buffer[BUFSIZ];
 		while (1) {
 			memset(buffer, 0, sizeof(buffer));
-			// dbg("enter read loop");
+			tcpLock.lock();
+			if(closing){
+				tcpLock.unlock();
+				return -1;
+			}
 			int readSize = read(fd, buffer, sizeof(buffer));
+			dbg("READ");
+			tcpLock.unlock();
 			// dbg(readSize);
 			if (readSize > 0) {
 				readAction(buffer, readSize, this);
@@ -41,6 +83,7 @@ public:
 			}
 			else {
 				perror("read");
+				dbg(errno);
 				return -1;
 			}
 		}
@@ -49,42 +92,23 @@ public:
 	int tcpconnWrite() {
 		int size = 0;
 		char* writeBuffer =  writeAction(&size, this);
-		int writeSize = write(fd, writeBuffer, size); 
-		assert(writeSize >= 0);
-		return 0;
-	}
-
-	friend void* dealWithClient(void* cli) {
-		tcpconn* cliTcp = static_cast<tcpconn*>(cli);
-
-		cliTcp->tcpLock.lock();
-		if (cliTcp->ev.getEvent() & EPOLLIN) {
-			if (cliTcp->tcpconnRead() == 0) {
-				cliTcp->closing = true;
-			}
+		tcpLock.lock();
+		listMutex->lock();
+		if(closing){
+			listMutex->unlock();
+			tcpLock.unlock();
+			return 1;
 		}
-		if(cliTcp->ev.getEvent() & EPOLLOUT) {
-			int ret = cliTcp->tcpconnWrite();
-			assert(ret == 0);
-		}
-		cliTcp->tcpLock.unlock();
-		close(cliTcp->fd);
-	}
-
-	const int getfd() const { return fd; }
-	const int operator*() const { return getfd(); }
-	void setReadOnly(){
-		ev.hangRD();
-	}
-	void setWrite(){
-		ev.hangWR();
-	}
-	void waitToClose(){
-		closing = true;
-	}
-
-	~tcpconn() {
+		int writeSize = write(fd, writeBuffer, size);
+		dbg("WRITE");
+		if(writeSize == -1)perror("write");
+		// assert(writeSize >= 0);
 		ev.destroy();
+		close(fd);
+		closing = true;
+		listMutex->unlock();
+		tcpLock.unlock();
+		return 0;
 	}
 
 public:
@@ -96,6 +120,7 @@ private:
 	void (*readAction)(char* buf, int size, tcpconn* wk);
 	char* (*writeAction)(int* size, tcpconn* wk);
 	event ev;
+	mutex* listMutex;
 };
 
 
