@@ -76,11 +76,11 @@ public:
     {
         while (true)
         {
-            dbg("epoll wait");
+            // dbg("epoll wait");
 
             int ret = epoll_wait(epolltree.getepfd(), epolltree.eventsList, MAX_CLIENTS, -1);
             assert(ret > 0);
-            dbg("accept");
+            // dbg("accept");
             for (int i = 0; i < ret; ++i)
             {
                 // dbg("deal with event");
@@ -125,6 +125,7 @@ public:
             newcli = new tcpconn(clifd, readAction, writeAction, &epolltree, &tcpconnsListMutex);
             if(newcli == nullptr)dbg("NEW CLIENT FAILED");
         }
+        // dbg(tcpconnsList.size());
         tcpconnsList.push_back(newcli);
         tcpconnsListMutex.unlock();
     }

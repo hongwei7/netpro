@@ -24,9 +24,9 @@ char* answer(int* size, tcpconn* wk){
 }
 
 void httpRequest(char* buf, int size, tcpconn* wk){
-    std::cout << "----request-----" << std::endl;
-    std::cout << buf ;
-    std::cout << "---------------" << std::endl;
+    // std::cout << "----request-----" << std::endl;
+    // std::cout << buf ;
+    // std::cout << "---------------" << std::endl;
     // dbg("REQUEST");
 }
 

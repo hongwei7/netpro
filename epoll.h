@@ -44,13 +44,11 @@ public:
     const int getfd() const { return cliFd; }
     const int getEvent() const { return event_impl.events; }
     void destroy() {
-        static int destroynum = 0;
-        dbg(destroynum++);
         int ret = epoll_ctl(epollTree->getepfd(), EPOLL_CTL_DEL, cliFd, nullptr);
-        if (ret == -1) {
-            perror("delete epoll_event");
-        }
-        assert(ret == 0);
+        // if (ret == -1) {
+        //     perror("delete epoll_event");
+        // }
+        // assert(ret == 0);
     }
 
 private:
