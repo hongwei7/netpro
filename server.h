@@ -69,7 +69,8 @@ public:
         assert(bind(sockfd, (sockaddr *)&servAddr, sizeof(servAddr)) == 0);
         assert(listen(sockfd, 128) == 0);
         tcpconnsListMutex.lock();
-        tcpconnsList.push_back(new tcpconn(sockfd, nullptr, nullptr, &epolltree, &tcpconnsListMutex));
+        std::shared_ptr<tcpconn> sockTcp(new tcpconn (sockfd, nullptr, nullptr, &epolltree, &tcpconnsListMutex));
+        tcpconnsList.push_back(new event<tcpconn>(&epolltree, sockfd, sockTcp));
         tcpconnsListMutex.unlock();
     }
     void mainloop()
@@ -84,31 +85,17 @@ public:
             for (int i = 0; i < ret; ++i)
             {
                 // dbg("deal with event");
-                tcpconn *ptr = (tcpconn *)epolltree.eventsList[i].data.ptr;
+                event<tcpconn> *ptr = (event<tcpconn>*)epolltree.eventsList[i].data.ptr;
                 if (ptr->getfd() == sockfd)
                     newClient();
                 else
                 {
-                    ptr->tcpLock.lock();
-                    if (ptr->closing)
-                        continue;
-                    ptr->tcpLock.unlock();
-                    pool.threadPoolAdd(dealWithClient, (void *)&(epolltree.eventsList[i]));
+                    dbg(tcpconnsList.size());
+                    dbg(ptr->getfd());
+                    std::shared_ptr<tcpconn> tcpPtr(ptr->tcpPtr);
+                    pool.threadPoolAdd(dealWithClient, (void*) &(epolltree.eventsList[i]));
                 }
             }
-
-            // tcpconnsListMutex.lock();
-            // dbg("CLEANING");
-            // for(auto cli: tcpconnsList){
-            //     dbg(cli);
-            //     dbg(cli->closing);
-            //     if(cli->closing){
-            //         tcpconnsList.remove(cli);
-            //         delete cli;
-            //     }
-            // }
-            // dbg(tcpconnsList.size());
-            // tcpconnsListMutex.unlock();
 
         }
     }
@@ -120,23 +107,16 @@ public:
         setNonBlock(clifd);
         // dbg(clifd);
         tcpconnsListMutex.lock();
-        tcpconn* newcli = nullptr;
-        while(newcli == nullptr){
-            newcli = new tcpconn(clifd, readAction, writeAction, &epolltree, &tcpconnsListMutex);
-            if(newcli == nullptr)dbg("NEW CLIENT FAILED");
-        }
+        std::shared_ptr<tcpconn> newcli(new tcpconn(clifd, readAction, writeAction, &epolltree, &tcpconnsListMutex));
         // dbg(tcpconnsList.size());
-        tcpconnsList.push_back(newcli);
+        tcpconnsList.push_back(new event<tcpconn>(&epolltree, clifd, newcli));
+        dbg("NEW CLIENT");
         tcpconnsListMutex.unlock();
     }
 
     virtual ~server()
     {
         tcpconnsListMutex.lock();
-        for (auto &cli : tcpconnsList)
-        {
-            delete cli;
-        }
         tcpconnsList.clear();
         tcpconnsListMutex.unlock();
     }
@@ -147,7 +127,7 @@ private:
     epoll epolltree;
     void (*readAction)(char *, int, tcpconn *);
     char *(*writeAction)(int *, tcpconn *);
-    std::list<tcpconn *> tcpconnsList;
+    std::list<event<tcpconn>*> tcpconnsList;
     mutex tcpconnsListMutex;
     threadPool pool;
 };

@@ -4,9 +4,11 @@
 #include <sys/epoll.h>
 #include <assert.h>
 #include <string.h>
+#include <memory>
 #include "dbg.h"
 #include "noncopyable.h"
 #include "threadPool.h"
+#include "tcpconn.h"
 
 const int EPOLL_INIT_SIZE = 5;
 const int MAX_CLIENTS = 60000;
@@ -28,13 +30,14 @@ private:
     int epfd;
 };
 
-class event : public noncopyable {
+template<typename T>
+class event {
 public:
-    event(epoll* ep, int cli, void* wk)
-        : epollTree(ep), cliFd(cli){
+    event(epoll* ep, int cli, std::shared_ptr<T> wk)
+        : epollTree(ep), cliFd(cli), tcpPtr(wk){
         if(cliFd == ep->getepfd()) event_impl.events = EPOLLIN;
         else event_impl.events = EPOLLIN | EPOLLOUT | EPOLLET; 
-        event_impl.data.ptr = (void*)wk;
+        event_impl.data.ptr = (void*)this;
         int ret = epoll_ctl(epollTree->getepfd(), EPOLL_CTL_ADD, cliFd, &event_impl);
         if (ret == -1) {
             perror("create event");
@@ -46,11 +49,14 @@ public:
     const int getEvent() const { return event_impl.events; }
     void destroy() {
         int ret = epoll_ctl(epollTree->getepfd(), EPOLL_CTL_DEL, cliFd, nullptr);
-        // if (ret == -1) {
-        //     perror("delete epoll_event");
-        // }
-        // assert(ret == 0);
+        if (ret == -1) {
+            perror("delete epoll_event");
+        }
+        assert(ret == 0);
     }
+
+public:
+    std::shared_ptr<T> tcpPtr;
 
 private:
     struct epoll_event event_impl;
