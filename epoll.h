@@ -32,7 +32,8 @@ class event : public noncopyable {
 public:
     event(epoll* ep, int cli, void* wk)
         : epollTree(ep), cliFd(cli){
-        event_impl.events = EPOLLIN | EPOLLOUT | EPOLLET; 
+        if(cliFd == ep->getepfd()) event_impl.events = EPOLLIN;
+        else event_impl.events = EPOLLIN | EPOLLOUT | EPOLLET; 
         event_impl.data.ptr = (void*)wk;
         int ret = epoll_ctl(epollTree->getepfd(), EPOLL_CTL_ADD, cliFd, &event_impl);
         if (ret == -1) {
