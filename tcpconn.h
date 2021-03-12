@@ -5,61 +5,93 @@
 #include <unistd.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <map>
 #include "epoll.h"
 #include "dbg.h"
 
-void* dealWithClient(void*);
+void* dealWithClientRead(void*);
+void* dealWithClientWrite(void*);
 void closeTcpconn(void*);
 
 // const int TRY_LOCK_WAIT_TIME = 1000;    //申请锁失败时睡眠1ms
 int CLIENT_DONE = 0;
 
+
 class tcpconn : noncopyable {
 public:
 	tcpconn(int file, void(*raction)(char*, int, tcpconn*), char*(*waction)(int*, tcpconn*), 
-	epoll* tree, mutex* tlm)
-	: fd(file), readAction(raction), writeAction(waction), listMutex(tlm){ } 
+	epoll* tree)
+	: fd(file), readAction(raction), writeAction(waction), fin(false){ } 
 
-	friend void* dealWithClient(void* ev_) {
-		dbg("DEALWITHCLIENT");
-		epoll_event* cliev = static_cast<epoll_event*>(ev_);
-		event<tcpconn>* even = (event<tcpconn>*)cliev->data.ptr;
-		tcpconn* cliTcp = even->tcpPtr;
-
-		// dbg(cliev->events & EPOLLIN);
-		// dbg(cliev->events & EPOLLOUT);
-
-		dbg("READING EVENT");
-
-		if (cliev->events & EPOLLIN) {
-			dbg("EPOLLIN");
-			cliTcp->tcpLock.lock();
-			int ret = cliTcp->tcpconnRead();
-			cliTcp->tcpLock.unlock();
-			if(ret == 0){
-				//关闭连接
-				dbg("CLIENT EXIT");
-				cliTcp->tcpLock.lock();
-				delete even->sharedPtr;
-				cliTcp->tcpLock.unlock();
-				return NULL;
-			}
-			else if(ret == -1)return NULL;
+	friend void* dealWithClientRead(void* cli_fd) {
+		// auto tcpMap = tcpMap;
+		// auto listMutex = listMutex;
+		int clifd = *((int*)cli_fd);
+		listMutex->lock();
+		auto iter = tcpMap->find(clifd);
+		std::shared_ptr<event<tcpconn>> even;
+		if(iter == tcpMap->end()){
+			listMutex->unlock();
+			return NULL;
 		}
-
-		if(cliev->events & EPOLLOUT){
-			dbg("EPOLLOUT");
-			// dbg("BEFORE WRITE");
-			cliTcp->tcpLock.lock();
-			int ret = cliTcp->tcpconnWrite();
-			cliTcp->tcpLock.unlock();
-			// dbg("BEHIND WRITE");
+		else {
+			even = (*iter).second;
 		}
-		dbg(even->sharedPtr->use_count());
+		listMutex->unlock();
+		dbg("DEALWITHCLIENT READ");
+		auto cliTcp = even->tcpPtr; 
+
 		cliTcp->tcpLock.lock();
-		delete even->sharedPtr;
+		int ret = cliTcp->tcpconnRead();
+		if(!cliTcp->fin)cliTcp->fin = true;
+		else{ 
+			listMutex->lock();
+			tcpMap->erase(clifd);
+			listMutex->unlock();
+		}
 		cliTcp->tcpLock.unlock();
-		dbg("LOOP END");
+		if(ret == 0){
+			//关闭连接
+			dbg("CLIENT EXIT");
+			// cliTcp->tcpLock.lock();
+			// delete even->sharedPtr;
+			// cliTcp->tcpLock.unlock();
+			return NULL;
+		}
+		else if(ret == -1)return NULL;
+		dbg("READ LOOP END");
+	}
+	friend void* dealWithClientWrite(void* cli_fd){
+		dbg("DEALWITHCLIENT WRITE");
+		int clifd = *((int*)cli_fd);
+		// auto listMutex = listMutex;
+		// auto tcpMap = tcpMap;
+
+		listMutex->lock();
+		auto iter = tcpMap->find(clifd);
+		std::shared_ptr<event<tcpconn>> even;
+		if(iter == tcpMap->end()){
+			dbg("DEALWITHCLIENT WRITE OUT");
+			listMutex->unlock();
+			return NULL;
+		}
+		else {
+			even = (*iter).second;
+		}
+		listMutex->unlock();
+		auto cliTcp = even->tcpPtr; 
+
+		cliTcp->tcpLock.lock();
+		if(!cliTcp->fin)cliTcp->fin = true;
+		else{ 
+			listMutex->lock();
+			tcpMap->erase(clifd);
+			listMutex->unlock();
+		}
+		int ret = cliTcp->tcpconnWrite();
+		// delete even->sharedPtr;
+		cliTcp->tcpLock.unlock();
+		dbg("WRITE LOOP END");
 		return NULL;
 	}
 
@@ -85,7 +117,7 @@ public:
 				perror("read");
 				dbg(errno);
 				tcpLock.unlock();
-				pthread_exit(NULL);
+				return -1;
 			}
 		}
 	}
@@ -110,18 +142,23 @@ public:
 		}
 	}
 	~tcpconn(){
-		// dbg(close(fd));
+		dbg(tcpMap->erase(fd));
+		dbg("------CONNECT OUT------");
 	}
 
+public:
+	static mutex* listMutex;
+	static std::map<int, std::shared_ptr<event<tcpconn>>> *tcpMap;
+	bool fin;
 
 private:
 	int fd;
 	void (*readAction)(char* buf, int size, tcpconn* wk);
 	char* (*writeAction)(int* size, tcpconn* wk);
-	mutex* listMutex;
 	mutex tcpLock;
 };
 
-
+std::map<int, std::shared_ptr<event<tcpconn>>> * tcpconn::tcpMap = nullptr;
+mutex* tcpconn::listMutex = nullptr;
 
 #endif

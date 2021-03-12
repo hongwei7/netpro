@@ -39,6 +39,11 @@ int setNonBlock(int sock)
     return ret;
 }
 
+struct mappingTask{
+    int fd;
+    std::map<int, std::shared_ptr<tcpconn>>* map;
+};
+
 class server
 {
 public:
@@ -46,6 +51,8 @@ public:
         : sockfd(socket(AF_INET, SOCK_STREAM, 0)), readAction(raction), writeAction(waction),
           pool(DEFAULT_POOL_MIN, DEFAULT_POOL_MAX, DEFAULT_TASK_NUM)
     {
+        tcpconn::tcpMap = &tcpMap;
+        tcpconn::listMutex = &tcpconnsListMutex;
         if (readAction == nullptr)
             readAction = defaultRead;
         if (writeAction == nullptr)
@@ -69,8 +76,8 @@ public:
 
         assert(bind(sockfd, (sockaddr *)&servAddr, sizeof(servAddr)) == 0);
         assert(listen(sockfd, 128) == 0);
-        tcpconn* sockTcp = new tcpconn (sockfd, nullptr, nullptr, &epolltree, &tcpconnsListMutex);
-        auto ev = new event<tcpconn>(&epolltree, sockfd, sockTcp, false);
+        tcpconn* sockTcp = new tcpconn (sockfd, nullptr, nullptr, &epolltree);
+        auto ev = new event<tcpconn>(&epolltree, sockfd, sockTcp, true);
         // tcpconnsList.push_back(*ev->sharedPtr);
         tcpMap[sockfd] = *ev->sharedPtr;
     }
@@ -86,36 +93,30 @@ public:
             assert(ret > 0);
             dbg(ret);
 
-            // for(int i = 0; i < ret; ++i){
-            //     auto sptr = ((event<tcpconn>*)epolltree.eventsList[i].data.ptr)->sharedPtr;
-            //     sPtrVec.push_back(*sptr);
-            //     dbg(sPtrVec.size());
-            // }
 
-            // dbg("accept");
             for (int i = 0; i < ret; ++i)
             {
                 dbg("deal with event");
-                // dbg(sPtrVec[i]->getfd());
-                event<tcpconn> *ptr = (event<tcpconn>*)epolltree.eventsList[i].data.ptr;
-                
-                dbg(ptr->getfd());
-                if (ptr->getfd() == sockfd)
+                int clifd = epolltree.eventsList[i].data.fd;
+                if (clifd == sockfd)
                     newClient();
                 else
                 {
-                    if(tcpMap.find(ptr->getfd()) == tcpMap.end()){
+                    tcpconnsListMutex.lock();
+                    auto iter = tcpMap.find(clifd);
+                    if(iter == tcpMap.end()){
                         dbg("-----");
-                        dbg(ptr->getfd());
+                        tcpconnsListMutex.unlock();
                         continue;
                     }
-                    tcpMap.erase(ptr->getfd());
-                    dbg("deal with event");
-                    // dbg(tcpconnsList.size());
+
                     epolltree.eventsList[i];
-                    dbg("BEFORE DEAL");
-                    std::shared_ptr<event<tcpconn>> sharedPtr(*ptr->sharedPtr);
-                    pool.threadPoolAdd(dealWithClient, (void*) &(epolltree.eventsList[i]));
+                    std::shared_ptr<event<tcpconn>> sharedPtr(iter->second);
+                    tcpconnsListMutex.unlock();
+                    if(epolltree.eventsList[i].events & EPOLLIN)
+                        pool.threadPoolAdd(dealWithClientRead, (void*) &clifd);
+                    if(epolltree.eventsList[i].events & EPOLLOUT)
+                        pool.threadPoolAdd(dealWithClientWrite, (void*) &clifd);
                     // dealWithClient((void*)&epolltree.eventsList[i]);
                     // tcpconnsList.remove(sharedPtr);
                     dbg("MAIN LOOP END");
@@ -126,17 +127,18 @@ public:
     }
     void newClient()
     {
-        dbg("NEW CLIENT");
+        dbg("------NEW CLIENT------");
         socklen_t socksize = sizeof(cliAddr);
         int clifd = accept(sockfd, (sockaddr *)&cliAddr, &socksize);
         assert(clifd > 0);
         setNonBlock(clifd);
         // dbg(clifd);
-        tcpconn* newcli = new tcpconn(clifd, readAction, writeAction, &epolltree, &tcpconnsListMutex);
+        tcpconn* newcli = new tcpconn(clifd, readAction, writeAction, &epolltree);
         // dbg(tcpconnsList.size());
-        auto ev = new event<tcpconn>(&epolltree, clifd, newcli, true);
+        auto ev = new event<tcpconn>(&epolltree, clifd, newcli, false);
         // tcpconnsList.push_back(*ev->sharedPtr);
         tcpMap[clifd] = *ev->sharedPtr;
+        delete ev->sharedPtr;
     }
 
     virtual ~server()
