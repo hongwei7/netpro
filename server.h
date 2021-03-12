@@ -3,6 +3,7 @@
 
 #include <sys/socket.h>
 #include <list>
+#include <map>
 #include <assert.h>
 #include <sys/types.h>
 #include <fcntl.h>
@@ -68,32 +69,56 @@ public:
 
         assert(bind(sockfd, (sockaddr *)&servAddr, sizeof(servAddr)) == 0);
         assert(listen(sockfd, 128) == 0);
-        tcpconnsListMutex.lock();
-        std::shared_ptr<tcpconn> sockTcp(new tcpconn (sockfd, nullptr, nullptr, &epolltree, &tcpconnsListMutex));
-        tcpconnsList.push_back(new event<tcpconn>(&epolltree, sockfd, sockTcp));
-        tcpconnsListMutex.unlock();
+        tcpconn* sockTcp = new tcpconn (sockfd, nullptr, nullptr, &epolltree, &tcpconnsListMutex);
+        auto ev = new event<tcpconn>(&epolltree, sockfd, sockTcp, false);
+        // tcpconnsList.push_back(*ev->sharedPtr);
+        tcpMap[sockfd] = *ev->sharedPtr;
     }
     void mainloop()
     {
+        // std::vector<std::weak_ptr<event<tcpconn>>> sPtrVec;
         while (true)
         {
             // dbg("epoll wait");
 
+
             int ret = epoll_wait(epolltree.getepfd(), epolltree.eventsList, MAX_CLIENTS, -1);
             assert(ret > 0);
+            dbg(ret);
+
+            // for(int i = 0; i < ret; ++i){
+            //     auto sptr = ((event<tcpconn>*)epolltree.eventsList[i].data.ptr)->sharedPtr;
+            //     sPtrVec.push_back(*sptr);
+            //     dbg(sPtrVec.size());
+            // }
+
             // dbg("accept");
             for (int i = 0; i < ret; ++i)
             {
-                // dbg("deal with event");
+                dbg("deal with event");
+                // dbg(sPtrVec[i]->getfd());
                 event<tcpconn> *ptr = (event<tcpconn>*)epolltree.eventsList[i].data.ptr;
+                
+                dbg(ptr->getfd());
                 if (ptr->getfd() == sockfd)
                     newClient();
                 else
                 {
-                    dbg(tcpconnsList.size());
-                    dbg(ptr->getfd());
-                    std::shared_ptr<tcpconn> tcpPtr(ptr->tcpPtr);
+                    if(tcpMap.find(ptr->getfd()) == tcpMap.end()){
+                        dbg("-----");
+                        dbg(ptr->getfd());
+                        continue;
+                    }
+                    tcpMap.erase(ptr->getfd());
+                    dbg("deal with event");
+                    // dbg(tcpconnsList.size());
+                    epolltree.eventsList[i];
+                    dbg("BEFORE DEAL");
+                    std::shared_ptr<event<tcpconn>> sharedPtr(*ptr->sharedPtr);
                     pool.threadPoolAdd(dealWithClient, (void*) &(epolltree.eventsList[i]));
+                    // dealWithClient((void*)&epolltree.eventsList[i]);
+                    // tcpconnsList.remove(sharedPtr);
+                    dbg("MAIN LOOP END");
                 }
             }
 
@@ -101,24 +126,22 @@ public:
     }
     void newClient()
     {
+        dbg("NEW CLIENT");
         socklen_t socksize = sizeof(cliAddr);
         int clifd = accept(sockfd, (sockaddr *)&cliAddr, &socksize);
         assert(clifd > 0);
         setNonBlock(clifd);
         // dbg(clifd);
-        tcpconnsListMutex.lock();
-        std::shared_ptr<tcpconn> newcli(new tcpconn(clifd, readAction, writeAction, &epolltree, &tcpconnsListMutex));
+        tcpconn* newcli = new tcpconn(clifd, readAction, writeAction, &epolltree, &tcpconnsListMutex);
         // dbg(tcpconnsList.size());
-        tcpconnsList.push_back(new event<tcpconn>(&epolltree, clifd, newcli));
-        dbg("NEW CLIENT");
-        tcpconnsListMutex.unlock();
+        auto ev = new event<tcpconn>(&epolltree, clifd, newcli, true);
+        // tcpconnsList.push_back(*ev->sharedPtr);
+        tcpMap[clifd] = *ev->sharedPtr;
     }
 
     virtual ~server()
     {
-        tcpconnsListMutex.lock();
-        tcpconnsList.clear();
-        tcpconnsListMutex.unlock();
+        // tcpconnsList.clear();
     }
 
 private:
@@ -127,7 +150,8 @@ private:
     epoll epolltree;
     void (*readAction)(char *, int, tcpconn *);
     char *(*writeAction)(int *, tcpconn *);
-    std::list<event<tcpconn>*> tcpconnsList;
+    // std::list<std::shared_ptr<event<tcpconn>>> tcpconnsList;
+    std::map<int, std::shared_ptr<event<tcpconn>>> tcpMap;
     mutex tcpconnsListMutex;
     threadPool pool;
 };

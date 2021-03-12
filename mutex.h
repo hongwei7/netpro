@@ -11,8 +11,8 @@ public:
     mutex(){
         pthread_mutex_init(&mutex_, NULL);
     }
-    void lock(){
-        assert(pthread_mutex_lock(&mutex_) == 0);
+    int lock(){
+        return pthread_mutex_lock(&mutex_);
     }
     int trylock(){
         int ret = pthread_mutex_trylock(&mutex_);
@@ -24,8 +24,8 @@ public:
             abort();
         }
     }
-    void unlock(){
-        assert(pthread_mutex_unlock(&mutex_) == 0);
+    int unlock(){
+        return pthread_mutex_unlock(&mutex_);
     }
     pthread_mutex_t* getlock(){return &mutex_;}
     virtual ~mutex(){

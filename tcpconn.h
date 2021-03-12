@@ -24,18 +24,24 @@ public:
 		dbg("DEALWITHCLIENT");
 		epoll_event* cliev = static_cast<epoll_event*>(ev_);
 		event<tcpconn>* even = (event<tcpconn>*)cliev->data.ptr;
-		std::shared_ptr<tcpconn> cliTcp = (even)->tcpPtr;
+		tcpconn* cliTcp = even->tcpPtr;
+
 		// dbg(cliev->events & EPOLLIN);
 		// dbg(cliev->events & EPOLLOUT);
 
+		dbg("READING EVENT");
 
 		if (cliev->events & EPOLLIN) {
 			dbg("EPOLLIN");
-			// if(cliTcp->closing)return NULL;
+			cliTcp->tcpLock.lock();
 			int ret = cliTcp->tcpconnRead();
+			cliTcp->tcpLock.unlock();
 			if(ret == 0){
 				//关闭连接
-				delete even;
+				dbg("CLIENT EXIT");
+				cliTcp->tcpLock.lock();
+				delete even->sharedPtr;
+				cliTcp->tcpLock.unlock();
 				return NULL;
 			}
 			else if(ret == -1)return NULL;
@@ -44,11 +50,16 @@ public:
 		if(cliev->events & EPOLLOUT){
 			dbg("EPOLLOUT");
 			// dbg("BEFORE WRITE");
-			int ret = cliTcp->tcpconnWrite(even);
-			// dbg(ret);
+			cliTcp->tcpLock.lock();
+			int ret = cliTcp->tcpconnWrite();
+			cliTcp->tcpLock.unlock();
 			// dbg("BEHIND WRITE");
 		}
-
+		dbg(even->sharedPtr->use_count());
+		cliTcp->tcpLock.lock();
+		delete even->sharedPtr;
+		cliTcp->tcpLock.unlock();
+		dbg("LOOP END");
 		return NULL;
 	}
 
@@ -73,33 +84,42 @@ public:
 			else {
 				perror("read");
 				dbg(errno);
-				return -1;
+				tcpLock.unlock();
+				pthread_exit(NULL);
 			}
 		}
 	}
 
-	int tcpconnWrite(event<tcpconn>* even) {
+	int tcpconnWrite() {
 		int size = 0;
 		char* writeBuffer =  writeAction(&size, this);
 		int writeSize = write(fd, writeBuffer, size);
+		dbg("WRITE");
 		if(writeSize == -1)perror("write");
 		assert(writeSize >= 0);
-		delete even;
 		return 0;
 	}
+	void lock(){
+		if(tcpLock.lock() != 0){
+			pthread_exit(NULL);
+		}
+	}
+	void unlock(){
+		if(tcpLock.unlock() != 0){
+			pthread_exit(NULL);
+		}
+	}
 	~tcpconn(){
-		close(fd);
+		// dbg(close(fd));
 	}
 
-public:
-	mutex tcpLock;
-	bool closing;
 
 private:
 	int fd;
 	void (*readAction)(char* buf, int size, tcpconn* wk);
 	char* (*writeAction)(int* size, tcpconn* wk);
 	mutex* listMutex;
+	mutex tcpLock;
 };
 
 

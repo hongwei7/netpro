@@ -33,9 +33,9 @@ private:
 template<typename T>
 class event {
 public:
-    event(epoll* ep, int cli, std::shared_ptr<T> wk)
-        : epollTree(ep), cliFd(cli), tcpPtr(wk){
-        if(cliFd == ep->getepfd()) event_impl.events = EPOLLIN;
+    event(epoll* ep, int cli, T* wk, bool ET)
+        : epollTree(ep), cliFd(cli), tcpPtr(wk), sharedPtr(new std::shared_ptr<event<T>>(this)){
+        if(!ET) event_impl.events = EPOLLIN;
         else event_impl.events = EPOLLIN | EPOLLOUT | EPOLLET; 
         event_impl.data.ptr = (void*)this;
         int ret = epoll_ctl(epollTree->getepfd(), EPOLL_CTL_ADD, cliFd, &event_impl);
@@ -54,9 +54,14 @@ public:
         }
         assert(ret == 0);
     }
+    ~event(){
+        dbg(close(tcpPtr->getfd()));
+        delete tcpPtr;
+    }
 
 public:
-    std::shared_ptr<T> tcpPtr;
+    T* tcpPtr;
+    std::shared_ptr<event<T>>* sharedPtr;
 
 private:
     struct epoll_event event_impl;
