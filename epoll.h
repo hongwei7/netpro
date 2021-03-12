@@ -55,7 +55,6 @@ public:
         assert(ret == 0);
     }
     ~event(){
-        dbg(close(tcpPtr->getfd()));
         delete tcpPtr;
     }
 

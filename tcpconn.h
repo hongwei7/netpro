@@ -43,23 +43,25 @@ public:
 
 		cliTcp->tcpLock.lock();
 		int ret = cliTcp->tcpconnRead();
+		cliTcp->tcpLock.unlock();
 		if(!cliTcp->fin)cliTcp->fin = true;
 		else{ 
 			listMutex->lock();
 			tcpMap->erase(clifd);
 			listMutex->unlock();
 		}
-		cliTcp->tcpLock.unlock();
 		if(ret == 0){
 			//关闭连接
 			dbg("CLIENT EXIT");
-			// cliTcp->tcpLock.lock();
-			// delete even->sharedPtr;
-			// cliTcp->tcpLock.unlock();
+			listMutex->lock();
+			tcpMap->erase(clifd);
+			listMutex->unlock();
+
 			return NULL;
 		}
 		else if(ret == -1)return NULL;
 		dbg("READ LOOP END");
+		return NULL;
 	}
 	friend void* dealWithClientWrite(void* cli_fd){
 		dbg("DEALWITHCLIENT WRITE");
@@ -142,7 +144,10 @@ public:
 		}
 	}
 	~tcpconn(){
-		dbg(tcpMap->erase(fd));
+		listMutex->lock();
+		tcpMap->erase(fd) == 0;
+		close(fd);
+		listMutex->unlock();
 		dbg("------CONNECT OUT------");
 	}
 
