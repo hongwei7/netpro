@@ -90,8 +90,8 @@ public:
 
 
             int ret = epoll_wait(epolltree.getepfd(), epolltree.eventsList, MAX_CLIENTS, -1);
-            assert(ret > 0);
             dbg(ret);
+            assert(ret >= 0);
 
 
             for (int i = 0; i < ret; ++i)
