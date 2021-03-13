@@ -59,7 +59,6 @@ public:
 		}
 		else if(ret == -1)return NULL;
 		cliTcp->unlock();
-		cliTcp->canWrite.signal();
 		dbg("READ LOOP END");
 		return NULL;
 	}
