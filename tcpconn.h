@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <map>
 #include <signal.h>
+#include "sem.h"
 #include "epoll.h"
 #include "dbg.h"
 
@@ -34,6 +35,7 @@ public:
 		std::shared_ptr<event<tcpconn>> even;
 		if(iter == tcpMap->end()){
 			listMutex->unlock();
+			forwardRead.signal();
 			return NULL;
 		}
 		else {
@@ -45,12 +47,10 @@ public:
 		auto cliTcp = even->tcpPtr; 
 		cliTcp->lock();
 		int ret = cliTcp->tcpconnRead();
-		// // if(!cliTcp->fin)cliTcp->fin = true;
-		// else{ 
-		// 	listMutex->lock();
-		// 	tcpMap->erase(clifd);
-		// 	listMutex->unlock();
-		// }
+
+		dbg("SIGNAL");
+		forwardRead.signal();
+
 		if(ret == 0){
 			//关闭连接
 			dbg("CLIENT EXIT");
@@ -62,6 +62,7 @@ public:
 		}
 		else if(ret == -1)return NULL;
 		cliTcp->unlock();
+		cliTcp->canWrite.signal();
 		dbg("READ LOOP END");
 		return NULL;
 	}
@@ -77,14 +78,20 @@ public:
 		if(iter == tcpMap->end()){
 			dbg("DEALWITHCLIENT WRITE OUT");
 			listMutex->unlock();
+			forwardWrite.signal();
 			return NULL;
 		}
 		else {
 			even = (*iter).second;
 		}
 		listMutex->unlock();
+
 		auto cliTcp = even->tcpPtr; 
+		forwardWrite.signal();
+
 		assert(even.use_count() != 0);
+
+		cliTcp->canWrite.wait();
 
 		cliTcp->lock();
 		// if(!cliTcp->fin)cliTcp->fin = true;
@@ -155,7 +162,7 @@ public:
 	}
 	~tcpconn(){
 		listMutex->lock();
-		tcpMap->erase(fd) == 0;
+		tcpMap->erase(fd);
 		dbg(close(fd));
 		listMutex->unlock();
 		dbg("------CONNECT OUT------");
@@ -164,16 +171,19 @@ public:
 public:
 	static mutex* listMutex;
 	static std::map<int, std::shared_ptr<event<tcpconn>>> *tcpMap;
-	// bool fin = false;
+	static sem forwardRead, forwardWrite;
+	
 
 private:
 	int fd;
 	void (*readAction)(char* buf, int size, tcpconn* wk);
 	int (*writeAction)(char* buf, int size, tcpconn* wk);
 	mutex tcpLock;
+	sem canWrite;
 };
 
 std::map<int, std::shared_ptr<event<tcpconn>>> * tcpconn::tcpMap = nullptr;
 mutex* tcpconn::listMutex = nullptr;
+sem tcpconn::forwardRead, tcpconn::forwardWrite;
 
 #endif

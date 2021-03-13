@@ -122,11 +122,16 @@ public:
                     epolltree.eventsList[i];
                     std::shared_ptr<event<tcpconn>> sharedPtr(iter->second);
                     tcpconnsListMutex.unlock();
-                    if(epolltree.eventsList[i].events & EPOLLIN)
+                    if(epolltree.eventsList[i].events & EPOLLIN){
                         pool.threadPoolAdd(dealWithClientRead, (void*) &clifd);
-                    if(epolltree.eventsList[i].events & EPOLLOUT)
+                        tcpconn::forwardRead.wait();
+                    }
+                    if(epolltree.eventsList[i].events & EPOLLOUT){
                         pool.threadPoolAdd(dealWithClientWrite, (void*) &clifd);
+                        tcpconn::forwardWrite.wait();
+                    }
                     // dealWithClient((void*)&epolltree.eventsList[i]);
+                    dbg(sharedPtr.use_count());
                     dbg("MAIN LOOP END");
                 }
             }
@@ -149,10 +154,7 @@ public:
         delete ev->sharedPtr;
     }
 
-    virtual ~server()
-    {
-        // tcpconnsList.clear();
-    }
+
 
 private:
     int sockfd;
