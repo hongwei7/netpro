@@ -16,9 +16,6 @@ void* dealWithClientWrite(void*);
 void closeTcpconn(void*);
 
 
-// const int TRY_LOCK_WAIT_TIME = 1000;    //申请锁失败时睡眠1ms
-int CLIENT_DONE = 0;
-
 
 class tcpconn : noncopyable {
 public:
@@ -91,15 +88,11 @@ public:
 
 		assert(even.use_count() != 0);
 
-		cliTcp->canWrite.wait();
-
 		cliTcp->lock();
-		// if(!cliTcp->fin)cliTcp->fin = true;
-		// else{ 
 		listMutex->lock();
 		tcpMap->erase(clifd);
 		listMutex->unlock();
-		// }
+
 		int ret = cliTcp->tcpconnWrite();
 		cliTcp->unlock();
 		dbg("WRITE LOOP END");
@@ -179,7 +172,6 @@ private:
 	void (*readAction)(char* buf, int size, tcpconn* wk);
 	int (*writeAction)(char* buf, int size, tcpconn* wk);
 	mutex tcpLock;
-	sem canWrite;
 };
 
 std::map<int, std::shared_ptr<event<tcpconn>>> * tcpconn::tcpMap = nullptr;
