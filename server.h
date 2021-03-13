@@ -25,10 +25,10 @@ void defaultRead(char *buf, int size, tcpconn *wk)
 {
     dbg(buf);
 }
-char *defaultWrite(int *size, tcpconn *wk)
+int defaultWrite(char* buf, int size, tcpconn *wk)
 {
     dbg("default write back function");
-    return nullptr;
+    return 0;
 }
 int setNonBlock(int sock)
 {
@@ -47,7 +47,7 @@ struct mappingTask{
 class server
 {
 public:
-    server(int port, void (*raction)(char *, int, tcpconn *), char *(*waction)(int *, tcpconn *))
+    server(int port, void (*raction)(char *, int, tcpconn *), int(*waction)(char*, int , tcpconn *))
         : sockfd(socket(AF_INET, SOCK_STREAM, 0)), readAction(raction), writeAction(waction),
           pool(DEFAULT_POOL_MIN, DEFAULT_POOL_MAX, DEFAULT_TASK_NUM)
     {
@@ -98,8 +98,10 @@ public:
             {
                 dbg("deal with event");
                 int clifd = epolltree.eventsList[i].data.fd;
-                if (clifd == sockfd)
+                if (clifd == sockfd){
+                    dbg(clifd);
                     newClient();
+                }
                 else
                 {
                     tcpconnsListMutex.lock();
@@ -151,7 +153,7 @@ private:
     struct sockaddr_in servAddr, cliAddr;
     epoll epolltree;
     void (*readAction)(char *, int, tcpconn *);
-    char *(*writeAction)(int *, tcpconn *);
+    int (*writeAction)(char*, int, tcpconn *);
     // std::list<std::shared_ptr<event<tcpconn>>> tcpconnsList;
     std::map<int, std::shared_ptr<event<tcpconn>>> tcpMap;
     mutex tcpconnsListMutex;

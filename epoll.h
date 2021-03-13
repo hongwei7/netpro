@@ -35,7 +35,7 @@ class event {
 public:
     event(epoll* ep, int cli, T* wk, bool sock)
         : epollTree(ep), cliFd(cli), tcpPtr(wk), sharedPtr(new std::shared_ptr<event<T>>(this)){
-        if(sock) event_impl.events = EPOLLIN | EPOLLET;
+        if(sock) event_impl.events = EPOLLIN;
         else event_impl.events = EPOLLIN | EPOLLOUT | EPOLLET; 
         event_impl.data.fd = cli;
         int ret = epoll_ctl(epollTree->getepfd(), EPOLL_CTL_ADD, cliFd, &event_impl);

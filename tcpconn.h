@@ -19,7 +19,7 @@ int CLIENT_DONE = 0;
 
 class tcpconn : noncopyable {
 public:
-	tcpconn(int file, void(*raction)(char*, int, tcpconn*), char*(*waction)(int*, tcpconn*), 
+	tcpconn(int file, void(*raction)(char*, int, tcpconn*), int(*waction)(char*, int, tcpconn*), 
 	epoll* tree)
 	: fd(file), readAction(raction), writeAction(waction), fin(false){ } 
 
@@ -39,11 +39,10 @@ public:
 		}
 		listMutex->unlock();
 		dbg("DEALWITHCLIENT READ");
-		auto cliTcp = even->tcpPtr; 
 
-		cliTcp->tcpLock.lock();
+		auto cliTcp = even->tcpPtr; 
+		cliTcp->lock();
 		int ret = cliTcp->tcpconnRead();
-		cliTcp->tcpLock.unlock();
 		if(!cliTcp->fin)cliTcp->fin = true;
 		else{ 
 			listMutex->lock();
@@ -60,6 +59,7 @@ public:
 			return NULL;
 		}
 		else if(ret == -1)return NULL;
+		cliTcp->unlock();
 		dbg("READ LOOP END");
 		return NULL;
 	}
@@ -82,8 +82,9 @@ public:
 		}
 		listMutex->unlock();
 		auto cliTcp = even->tcpPtr; 
+		assert(even.use_count() != 0);
 
-		cliTcp->tcpLock.lock();
+		cliTcp->lock();
 		if(!cliTcp->fin)cliTcp->fin = true;
 		else{ 
 			listMutex->lock();
@@ -91,8 +92,7 @@ public:
 			listMutex->unlock();
 		}
 		int ret = cliTcp->tcpconnWrite();
-		// delete even->sharedPtr;
-		cliTcp->tcpLock.unlock();
+		cliTcp->unlock();
 		dbg("WRITE LOOP END");
 		return NULL;
 	}
@@ -118,19 +118,21 @@ public:
 			else {
 				perror("read");
 				dbg(errno);
-				tcpLock.unlock();
+				unlock();
 				return -1;
 			}
 		}
 	}
 
 	int tcpconnWrite() {
-		int size = 0;
-		char* writeBuffer =  writeAction(&size, this);
-		int writeSize = write(fd, writeBuffer, size);
+		dbg("WRITE-ACTION");
+		assert(fcntl(fd, F_GETFL));
+		char writeBuffer[BUFSIZ];
+		int size = writeAction(writeBuffer, BUFSIZ, this);
 		dbg("WRITE");
-		if(writeSize == -1)perror("write");
+		int writeSize = write(fd, writeBuffer, size);
 		assert(writeSize >= 0);
+		dbg("AFTER-WRITE");
 		return 0;
 	}
 	void lock(){
@@ -144,10 +146,12 @@ public:
 		}
 	}
 	~tcpconn(){
+		lock();
 		listMutex->lock();
 		tcpMap->erase(fd) == 0;
 		close(fd);
 		listMutex->unlock();
+		unlock();
 		dbg("------CONNECT OUT------");
 	}
 
@@ -159,7 +163,7 @@ public:
 private:
 	int fd;
 	void (*readAction)(char* buf, int size, tcpconn* wk);
-	char* (*writeAction)(int* size, tcpconn* wk);
+	int (*writeAction)(char* buf, int size, tcpconn* wk);
 	mutex tcpLock;
 };
 
