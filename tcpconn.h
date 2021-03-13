@@ -6,12 +6,14 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <map>
+#include <signal.h>
 #include "epoll.h"
 #include "dbg.h"
 
 void* dealWithClientRead(void*);
 void* dealWithClientWrite(void*);
 void closeTcpconn(void*);
+
 
 // const int TRY_LOCK_WAIT_TIME = 1000;    //申请锁失败时睡眠1ms
 int CLIENT_DONE = 0;
@@ -127,13 +129,14 @@ public:
 	int tcpconnWrite() {
 		dbg("WRITE-ACTION");
 		assert(fcntl(fd, F_GETFL));
-		char writeBuffer[BUFSIZ];
+		char writeBuffer[BUFSIZ] = "HTTP/1.1 200 OK\r\nDate: Sat, 31 Dec 2005 23:59:59 GMT\r\nContent-Type: text/html;charset=ISO-8859-1\r\n\r\n<html><head><title>TEST</title></head><body>HELLO</body></html>\n";
 
-		int size = writeAction(writeBuffer, BUFSIZ, this); //error
+		// int size = writeAction(writeBuffer, BUFSIZ, this); //error
+
 
 		dbg("WRITE");
-		int writeSize = write(fd, writeBuffer, size);
-		assert(writeSize >= 0);
+		int writeSize = write(fd, writeBuffer, strlen(writeBuffer)+1);
+		//assert(writeSize >= 0);
 		dbg("AFTER-WRITE");
 		return 0;
 	}

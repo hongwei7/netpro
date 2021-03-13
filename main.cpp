@@ -19,10 +19,21 @@ int httpResponse(char* buf, int size, tcpconn* wk){
     dbg("ANSWER");
     strcpy(buf, httpres);
     dbg("HTTPRES COPY");
-    return strlen(httpres);
+    return sizeof(httpres);
 }
 
 int main() {
+    sigset_t signal_mask;
+    sigemptyset (&signal_mask);  
+    sigaddset (&signal_mask, SIGPIPE);
+    int rc = pthread_sigmask (SIG_BLOCK, &signal_mask, NULL);
+    if (rc != 0)
+    {
+        printf("block sigpipe error\n");
+
+    } 
+
+
     server ser(SERVPORT, httpRequest, httpResponse);
     ser.mainloop();
 }

@@ -12,6 +12,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <signal.h>
 #include "tcpconn.h"
 #include "threadPool.h"
 #include "epoll.h"
@@ -39,18 +40,20 @@ int setNonBlock(int sock)
     return ret;
 }
 
-struct mappingTask{
-    int fd;
-    std::map<int, std::shared_ptr<tcpconn>>* map;
-};
+void handle_pipe(int sig)
+{
+    dbg("PIPE BROKEN");
+    pthread_exit(NULL);
+}   
 
 class server
 {
 public:
     server(int port, void (*raction)(char *, int, tcpconn *), int(*waction)(char*, int , tcpconn *))
         : sockfd(socket(AF_INET, SOCK_STREAM, 0)), readAction(raction), writeAction(waction),
-          pool(DEFAULT_POOL_MIN, DEFAULT_POOL_MAX, DEFAULT_TASK_NUM)
+        pool(DEFAULT_POOL_MIN, DEFAULT_POOL_MAX, DEFAULT_TASK_NUM)
     {
+
         tcpconn::tcpMap = &tcpMap;
         tcpconn::listMutex = &tcpconnsListMutex;
         if (readAction == nullptr)
@@ -89,8 +92,12 @@ public:
             // dbg("epoll wait");
 
 
-            int ret = epoll_wait(epolltree.getepfd(), epolltree.eventsList, MAX_CLIENTS, -1);
-            dbg(ret);
+            int ret = -1;
+            while(ret == -1){
+                ret = epoll_wait(epolltree.getepfd(), epolltree.eventsList, MAX_CLIENTS, -1);
+                dbg(ret);
+                if(ret == -1)perror("epoll wait");
+            }
             assert(ret >= 0);
 
 
@@ -120,7 +127,6 @@ public:
                     if(epolltree.eventsList[i].events & EPOLLOUT)
                         pool.threadPoolAdd(dealWithClientWrite, (void*) &clifd);
                     // dealWithClient((void*)&epolltree.eventsList[i]);
-                    // tcpconnsList.remove(sharedPtr);
                     dbg("MAIN LOOP END");
                 }
             }
