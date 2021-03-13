@@ -21,7 +21,7 @@ class tcpconn : noncopyable {
 public:
 	tcpconn(int file, void(*raction)(char*, int, tcpconn*), int(*waction)(char*, int, tcpconn*), 
 	epoll* tree)
-	: fd(file), readAction(raction), writeAction(waction), fin(false){ } 
+	: fd(file), readAction(raction), writeAction(waction) { } 
 
 	friend void* dealWithClientRead(void* cli_fd) {
 		// auto tcpMap = tcpMap;
@@ -43,12 +43,12 @@ public:
 		auto cliTcp = even->tcpPtr; 
 		cliTcp->lock();
 		int ret = cliTcp->tcpconnRead();
-		if(!cliTcp->fin)cliTcp->fin = true;
-		else{ 
-			listMutex->lock();
-			tcpMap->erase(clifd);
-			listMutex->unlock();
-		}
+		// // if(!cliTcp->fin)cliTcp->fin = true;
+		// else{ 
+		// 	listMutex->lock();
+		// 	tcpMap->erase(clifd);
+		// 	listMutex->unlock();
+		// }
 		if(ret == 0){
 			//关闭连接
 			dbg("CLIENT EXIT");
@@ -85,12 +85,12 @@ public:
 		assert(even.use_count() != 0);
 
 		cliTcp->lock();
-		if(!cliTcp->fin)cliTcp->fin = true;
-		else{ 
-			listMutex->lock();
-			tcpMap->erase(clifd);
-			listMutex->unlock();
-		}
+		// if(!cliTcp->fin)cliTcp->fin = true;
+		// else{ 
+		listMutex->lock();
+		tcpMap->erase(clifd);
+		listMutex->unlock();
+		// }
 		int ret = cliTcp->tcpconnWrite();
 		cliTcp->unlock();
 		dbg("WRITE LOOP END");
@@ -128,7 +128,9 @@ public:
 		dbg("WRITE-ACTION");
 		assert(fcntl(fd, F_GETFL));
 		char writeBuffer[BUFSIZ];
-		int size = writeAction(writeBuffer, BUFSIZ, this);
+
+		int size = writeAction(writeBuffer, BUFSIZ, this); //error
+
 		dbg("WRITE");
 		int writeSize = write(fd, writeBuffer, size);
 		assert(writeSize >= 0);
@@ -137,28 +139,29 @@ public:
 	}
 	void lock(){
 		if(tcpLock.lock() != 0){
+			listMutex->unlock();
+			unlock();
 			pthread_exit(NULL);
 		}
 	}
 	void unlock(){
 		if(tcpLock.unlock() != 0){
+			listMutex->unlock();
 			pthread_exit(NULL);
 		}
 	}
 	~tcpconn(){
-		lock();
 		listMutex->lock();
 		tcpMap->erase(fd) == 0;
-		close(fd);
+		dbg(close(fd));
 		listMutex->unlock();
-		unlock();
 		dbg("------CONNECT OUT------");
 	}
 
 public:
 	static mutex* listMutex;
 	static std::map<int, std::shared_ptr<event<tcpconn>>> *tcpMap;
-	bool fin;
+	// bool fin = false;
 
 private:
 	int fd;
