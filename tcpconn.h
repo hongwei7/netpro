@@ -15,7 +15,7 @@ void* dealWithClientRead(void*);
 void* dealWithClientWrite(void*);
 void closeTcpconn(void*);
 
-
+const int TIME_WAIT_SEC = 5;
 
 class tcpconn : noncopyable {
 public:
@@ -42,11 +42,12 @@ public:
 		dbg("DEALWITHCLIENT READ");
 
 		auto cliTcp = even->tcpPtr; 
+		forwardRead.signal();
+
 		// cliTcp->lock();
 		int ret = cliTcp->tcpconnRead();
-
+		cliTcp->needWrite.signal();
 		dbg("SIGNAL");
-		forwardRead.signal();
 
 		if(ret == 0){
 			//关闭连接
@@ -129,13 +130,13 @@ public:
 	int tcpconnWrite() {
 		dbg("WRITE-ACTION");
 		assert(fcntl(fd, F_GETFL));
-		char writeBuffer[BUFSIZ] = "HTTP/1.1 200 OK\r\nDate: Sat, 31 Dec 2005 23:59:59 GMT\r\nContent-Type: text/html;charset=ISO-8859-1\r\n\r\n<html><head><title>TEST</title></head><body>HELLO</body></html>\n";
+		char writeBuffer[BUFSIZ];
 
-		// int size = writeAction(writeBuffer, BUFSIZ, this); //error
-
+		needWrite.timeWait(TIME_WAIT_SEC, 0);
+		int size = writeAction(writeBuffer, BUFSIZ, this); //error
 
 		dbg("WRITE");
-		int writeSize = write(fd, writeBuffer, strlen(writeBuffer)+1);
+		int writeSize = write(fd, writeBuffer, size);
 		//assert(writeSize >= 0);
 		dbg("AFTER-WRITE");
 		return 0;
@@ -165,6 +166,7 @@ public:
 	static mutex* listMutex;
 	static std::map<int, std::shared_ptr<event<tcpconn>>> *tcpMap;
 	static sem forwardRead, forwardWrite;
+	sem needWrite;
 	
 
 private:
