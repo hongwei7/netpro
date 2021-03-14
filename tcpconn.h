@@ -46,7 +46,6 @@ public:
 
 		// cliTcp->lock();
 		int ret = cliTcp->tcpconnRead();
-		cliTcp->needWrite.signal();
 		dbg("SIGNAL");
 
 		if(ret == 0){
