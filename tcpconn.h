@@ -42,7 +42,7 @@ public:
 		dbg("DEALWITHCLIENT READ");
 
 		auto cliTcp = even->tcpPtr; 
-		cliTcp->lock();
+		// cliTcp->lock();
 		int ret = cliTcp->tcpconnRead();
 
 		dbg("SIGNAL");
@@ -58,7 +58,7 @@ public:
 			return NULL;
 		}
 		else if(ret == -1)return NULL;
-		cliTcp->unlock();
+		// cliTcp->unlock();
 		dbg("READ LOOP END");
 		return NULL;
 	}
@@ -83,17 +83,18 @@ public:
 		listMutex->unlock();
 
 		auto cliTcp = even->tcpPtr; 
-		forwardWrite.signal();
 
 		assert(even.use_count() != 0);
 
-		cliTcp->lock();
 		listMutex->lock();
 		tcpMap->erase(clifd);
 		listMutex->unlock();
 
+		forwardWrite.signal();
+
+		// cliTcp->lock();
 		int ret = cliTcp->tcpconnWrite();
-		cliTcp->unlock();
+		// cliTcp->unlock();
 		dbg("WRITE LOOP END");
 		return NULL;
 	}
