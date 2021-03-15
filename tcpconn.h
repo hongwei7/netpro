@@ -158,7 +158,6 @@ public:
 		tcpMap->erase(fd);
 		dbg(close(fd));
 		listMutex->unlock();
-		free(http);
 		dbg("------CONNECT OUT------");
 	}
 
@@ -176,7 +175,7 @@ public:
 	static std::map<int, std::shared_ptr<event<tcpconn>>> *tcpMap;
 	static sem forwardRead, forwardWrite;
 	sem needWrite;
-	httpconn* http;
+	httpconn http;
 	
 
 private:
