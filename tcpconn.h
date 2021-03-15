@@ -8,6 +8,7 @@
 #include <map>
 #include <signal.h>
 #include "sem.h"
+#include "http.h"
 #include "epoll.h"
 #include "dbg.h"
 
@@ -19,9 +20,9 @@ const int TIME_WAIT_SEC = 5;
 
 class tcpconn : noncopyable {
 public:
-	tcpconn(int file, void(*raction)(char*, int, tcpconn*), int(*waction)(char*, int, tcpconn*), 
-	epoll* tree)
-	: fd(file), readAction(raction), writeAction(waction) { } 
+	tcpconn(int file): fd(file) { 
+		memset(&httpInfo, 0, sizeof(httpInfo));
+	} 
 
 	friend void* dealWithClientRead(void* cli_fd) {
 		// auto tcpMap = tcpMap;
@@ -100,20 +101,21 @@ public:
 	const int getfd() const { return fd; }
 	const int operator*() const { return getfd(); }
 
-	virtual int readOnce() {
+	int readOnce() {
 		char buffer[BUFSIZ];
 		while (1) {
-			memset(buffer, 0, sizeof(buffer));
-			int readSize = read(fd, buffer, sizeof(buffer));
-			// dbg(readSize);
+			char readBuf[BUFSIZ];
+			int readSize = read(fd, httpInfo.mReadBuf + httpInfo.mReadIdx, sizeof(buffer));
+			httpInfo.mReadIdx += readSize;
+			dbg(readSize);
 			if (readSize > 0) {
-				readAction(buffer, readSize, this);
+				break;
 			}
 			else if (readSize == 0) {
 				return 0;                    //close
 			}
 			else if (errno == EWOULDBLOCK || errno == EAGAIN) {
-				return 1;
+				break;
 			}
 			else {
 				perror("read");
@@ -122,18 +124,17 @@ public:
 				return -1;
 			}
 		}
+		process();
+		needWrite.signal();
+		return 1;
 	}
 
-	virtual int doWrite() {
+	int doWrite() {
 		dbg("WRITE-ACTION");
 		assert(fcntl(fd, F_GETFL));
-		char writeBuffer[BUFSIZ];
-
-		needWrite.timeWait(TIME_WAIT_SEC, 0);
-		int size = writeAction(writeBuffer, BUFSIZ, this); 
-
+		needWrite.wait();
 		dbg("WRITE");
-		int writeSize = write(fd, writeBuffer, size);
+		int writeSize = write(fd, httpInfo.mWriteBuf, httpInfo.bytesToSend);
 		//assert(writeSize >= 0);
 		dbg("AFTER-WRITE");
 		return 0;
@@ -157,21 +158,30 @@ public:
 		tcpMap->erase(fd);
 		dbg(close(fd));
 		listMutex->unlock();
+		free(http);
 		dbg("------CONNECT OUT------");
 	}
+
+private:
+	void process() {
+		dbg("PROCESS");
+		char httpres[] = "HTTP/1.1 200 OK\r\nDate: Sat, 31 Dec 2005 23:59:59 GMT\r\nContent-Type: text/html;charset=ISO-8859-1\r\n\r\n<html><head><title>TEST</title></head><body>HELLO</body></html>\n";
+		strcpy(httpInfo.mWriteBuf, httpres);
+		httpInfo.bytesToSend = strlen(httpInfo.mWriteBuf) + 1;
+	};
 
 public:
 	static mutex* listMutex;
 	static std::map<int, std::shared_ptr<event<tcpconn>>> *tcpMap;
 	static sem forwardRead, forwardWrite;
 	sem needWrite;
+	httpconn* http;
 	
 
 private:
 	int fd;
-	void (*readAction)(char* buf, int size, tcpconn* wk);
-	int (*writeAction)(char* buf, int size, tcpconn* wk);
 	mutex tcpLock;
+	httpconn httpInfo;
 };
 
 std::map<int, std::shared_ptr<event<tcpconn>>> * tcpconn::tcpMap = nullptr;

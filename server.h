@@ -1,5 +1,5 @@
 #ifndef __NETPRO__SERVER__H
-#define __NETPRE__SERVER__H
+#define __NETPRO__SERVER__H
 
 
 #include <sys/socket.h>
@@ -19,19 +19,11 @@
 #include "epoll.h"
 #include "dbg.h"
 
-const int DEFAULT_POOL_MIN = 50;
+const int DEFAULT_POOL_MIN = 5;
 const int DEFAULT_POOL_MAX = 1000;
 const int DEFAULT_TASK_NUM = 100;
 
-void defaultRead(char *buf, int size, tcpconn *wk)
-{
-    dbg(buf);
-}
-int defaultWrite(char* buf, int size, tcpconn *wk)
-{
-    dbg("default write back function");
-    return 0;
-}
+
 int setNonBlock(int sock)
 {
     int flags;
@@ -41,26 +33,15 @@ int setNonBlock(int sock)
     return ret;
 }
 
-void handle_pipe(int sig)
-{
-    dbg("PIPE BROKEN");
-    pthread_exit(NULL);
-}   
-
 class server
 {
 public:
-    server(int port, void (*raction)(char *, int, tcpconn *), int(*waction)(char*, int , tcpconn *))
-        : sockfd(socket(AF_INET, SOCK_STREAM, 0)), readAction(raction), writeAction(waction),
+    server(int port): sockfd(socket(AF_INET, SOCK_STREAM, 0)),
         pool(DEFAULT_POOL_MIN, DEFAULT_POOL_MAX, DEFAULT_TASK_NUM)
     {
 
         tcpconn::tcpMap = &tcpMap;
         tcpconn::listMutex = &tcpconnsListMutex;
-        if (readAction == nullptr)
-            readAction = defaultRead;
-        if (writeAction == nullptr)
-            writeAction = defaultWrite;
         assert(sockfd != 0);
         memset(&servAddr, 0, sizeof(servAddr));
         memset(&cliAddr, 0, sizeof(cliAddr));
@@ -80,7 +61,7 @@ public:
 
         assert(bind(sockfd, (sockaddr *)&servAddr, sizeof(servAddr)) == 0);
         assert(listen(sockfd, 128) == 0);
-        tcpconn* sockTcp = new tcpconn (sockfd, nullptr, nullptr, &epolltree);
+        tcpconn* sockTcp = new tcpconn (sockfd);
         auto ev = new event<tcpconn>(&epolltree, sockfd, sockTcp, true);
         tcpMap[sockfd] = *ev->sharedPtr;
     }
@@ -145,7 +126,7 @@ public:
         assert(clifd > 0);
         setNonBlock(clifd);
         // dbg(clifd);
-        tcpconn* newcli = new tcpconn(clifd, readAction, writeAction, &epolltree);
+        tcpconn* newcli = new tcpconn(clifd);
         auto ev = new event<tcpconn>(&epolltree, clifd, newcli, false);
         tcpMap[clifd] = *ev->sharedPtr;
         delete ev->sharedPtr;
@@ -160,8 +141,6 @@ private:
     int sockfd;
     struct sockaddr_in servAddr, cliAddr;
     epoll epolltree;
-    void (*readAction)(char *, int, tcpconn *);
-    int (*writeAction)(char*, int, tcpconn *);
     std::map<int, std::shared_ptr<event<tcpconn>>> tcpMap;
     mutex tcpconnsListMutex;
     threadPool pool;
