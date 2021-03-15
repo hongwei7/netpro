@@ -132,7 +132,7 @@ public:
 	int doWrite() {
 		dbg("WRITE-ACTION");
 		assert(fcntl(fd, F_GETFL));
-		needWrite.wait();
+		if(needWrite.timeWait(TIME_WAIT_SEC, 0) == 1)return 0;
 		dbg("WRITE");
 		int writeSize = write(fd, httpInfo.mWriteBuf, httpInfo.bytesToSend);
 		//assert(writeSize >= 0);

@@ -100,7 +100,7 @@ public:
 
             pool->threadlocker.lock();
             int busyThreadNum = pool->busyThreadNum;
-            dbg(busyThreadNum);
+            // dbg(busyThreadNum);
             pool->threadlocker.unlock();
 
             if (queueSize >= MIN_WAIT_THREAD_NUM && liveThreadNum < pool->maxThreadNum) {   //创建新线程

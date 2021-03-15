@@ -1,5 +1,5 @@
-#ifndef __NETPRO__HTTPCONN__H
-#define __NETPRO__HTTPCONN__H
+#ifndef __NETPRO__HTTP__H
+#define __NETPRO__HTTP__H
 
 #include <assert.h>
 #include <string.h>

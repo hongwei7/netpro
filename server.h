@@ -3,7 +3,6 @@
 
 
 #include <sys/socket.h>
-#include <list>
 #include <map>
 #include <assert.h>
 #include <sys/types.h>
