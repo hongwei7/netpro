@@ -11,13 +11,12 @@ void httpRequest(char* buf, int size, tcpconn* wk){
     // std::cout << buf ;
     // std::cout << "---------------" << std::endl;
     // dbg("REQUEST");
+    usleep(10000);
+    wk->needWrite.signal();
 }
-
+char httpres[] = "HTTP/1.1 200 OK\r\nDate: Sat, 31 Dec 2005 23:59:59 GMT\r\nContent-Type: text/html;charset=ISO-8859-1\r\n\r\n<html><head><title>TEST</title></head><body>HELLO</body></html>\n";
 int httpResponse(char* buf, int size, tcpconn* wk){
-    char httpres[] = "HTTP/1.1 200 OK\r\nDate: Sat, 31 Dec 2005 23:59:59 GMT\r\nContent-Type: text/html;charset=ISO-8859-1\r\n\r\n<html><head><title>TEST</title></head><body>HELLO</body></html>\n";
-    dbg("ANSWER");
     strcpy(buf, httpres);
-    dbg("HTTPRES COPY");
     return sizeof(httpres);
 }
 
@@ -26,11 +25,7 @@ int main() {
     sigemptyset (&signal_mask);  
     sigaddset (&signal_mask, SIGPIPE);
     int rc = pthread_sigmask (SIG_BLOCK, &signal_mask, NULL);
-    if (rc != 0)
-    {
-        printf("block sigpipe error\n");
-
-    } 
+    if (rc != 0) printf("block sigpipe error\n");
 
 
     server ser(SERVPORT, httpRequest, httpResponse);

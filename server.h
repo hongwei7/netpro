@@ -19,9 +19,9 @@
 #include "epoll.h"
 #include "dbg.h"
 
-const int DEFAULT_POOL_MIN = 10;
+const int DEFAULT_POOL_MIN = 50;
 const int DEFAULT_POOL_MAX = 1000;
-const int DEFAULT_TASK_NUM = 50;
+const int DEFAULT_TASK_NUM = 100;
 
 void defaultRead(char *buf, int size, tcpconn *wk)
 {
@@ -82,12 +82,10 @@ public:
         assert(listen(sockfd, 128) == 0);
         tcpconn* sockTcp = new tcpconn (sockfd, nullptr, nullptr, &epolltree);
         auto ev = new event<tcpconn>(&epolltree, sockfd, sockTcp, true);
-        // tcpconnsList.push_back(*ev->sharedPtr);
         tcpMap[sockfd] = *ev->sharedPtr;
     }
     void mainloop()
     {
-        // std::vector<std::weak_ptr<event<tcpconn>>> sPtrVec;
         while (true)
         {
             // dbg("epoll wait");
@@ -148,9 +146,7 @@ public:
         setNonBlock(clifd);
         // dbg(clifd);
         tcpconn* newcli = new tcpconn(clifd, readAction, writeAction, &epolltree);
-        // dbg(tcpconnsList.size());
         auto ev = new event<tcpconn>(&epolltree, clifd, newcli, false);
-        // tcpconnsList.push_back(*ev->sharedPtr);
         tcpMap[clifd] = *ev->sharedPtr;
         delete ev->sharedPtr;
     }
@@ -166,7 +162,6 @@ private:
     epoll epolltree;
     void (*readAction)(char *, int, tcpconn *);
     int (*writeAction)(char*, int, tcpconn *);
-    // std::list<std::shared_ptr<event<tcpconn>>> tcpconnsList;
     std::map<int, std::shared_ptr<event<tcpconn>>> tcpMap;
     mutex tcpconnsListMutex;
     threadPool pool;

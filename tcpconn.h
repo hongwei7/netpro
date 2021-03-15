@@ -15,7 +15,7 @@ void* dealWithClientRead(void*);
 void* dealWithClientWrite(void*);
 void closeTcpconn(void*);
 
-
+const int TIME_WAIT_SEC = 5;
 
 class tcpconn : noncopyable {
 public:
@@ -42,11 +42,10 @@ public:
 		dbg("DEALWITHCLIENT READ");
 
 		auto cliTcp = even->tcpPtr; 
-		cliTcp->lock();
-		int ret = cliTcp->tcpconnRead();
-
-		dbg("SIGNAL");
 		forwardRead.signal();
+
+		int ret = cliTcp->readOnce();
+		dbg("SIGNAL");
 
 		if(ret == 0){
 			//关闭连接
@@ -58,7 +57,7 @@ public:
 			return NULL;
 		}
 		else if(ret == -1)return NULL;
-		cliTcp->unlock();
+
 		dbg("READ LOOP END");
 		return NULL;
 	}
@@ -83,17 +82,17 @@ public:
 		listMutex->unlock();
 
 		auto cliTcp = even->tcpPtr; 
-		forwardWrite.signal();
 
 		assert(even.use_count() != 0);
 
-		cliTcp->lock();
 		listMutex->lock();
 		tcpMap->erase(clifd);
 		listMutex->unlock();
 
-		int ret = cliTcp->tcpconnWrite();
-		cliTcp->unlock();
+		forwardWrite.signal();
+
+		int ret = cliTcp->doWrite();
+
 		dbg("WRITE LOOP END");
 		return NULL;
 	}
@@ -101,7 +100,7 @@ public:
 	const int getfd() const { return fd; }
 	const int operator*() const { return getfd(); }
 
-	int tcpconnRead() {
+	virtual int readOnce() {
 		char buffer[BUFSIZ];
 		while (1) {
 			memset(buffer, 0, sizeof(buffer));
@@ -113,7 +112,7 @@ public:
 			else if (readSize == 0) {
 				return 0;                    //close
 			}
-			else if (readSize == -1 && errno == EAGAIN) {
+			else if (errno == EWOULDBLOCK || errno == EAGAIN) {
 				return 1;
 			}
 			else {
@@ -125,20 +124,21 @@ public:
 		}
 	}
 
-	int tcpconnWrite() {
+	virtual int doWrite() {
 		dbg("WRITE-ACTION");
 		assert(fcntl(fd, F_GETFL));
-		char writeBuffer[BUFSIZ] = "HTTP/1.1 200 OK\r\nDate: Sat, 31 Dec 2005 23:59:59 GMT\r\nContent-Type: text/html;charset=ISO-8859-1\r\n\r\n<html><head><title>TEST</title></head><body>HELLO</body></html>\n";
+		char writeBuffer[BUFSIZ];
 
-		// int size = writeAction(writeBuffer, BUFSIZ, this); //error
-
+		needWrite.timeWait(TIME_WAIT_SEC, 0);
+		int size = writeAction(writeBuffer, BUFSIZ, this); 
 
 		dbg("WRITE");
-		int writeSize = write(fd, writeBuffer, strlen(writeBuffer)+1);
+		int writeSize = write(fd, writeBuffer, size);
 		//assert(writeSize >= 0);
 		dbg("AFTER-WRITE");
 		return 0;
 	}
+
 	void lock(){
 		if(tcpLock.lock() != 0){
 			listMutex->unlock();
@@ -164,6 +164,7 @@ public:
 	static mutex* listMutex;
 	static std::map<int, std::shared_ptr<event<tcpconn>>> *tcpMap;
 	static sem forwardRead, forwardWrite;
+	sem needWrite;
 	
 
 private:
