@@ -44,8 +44,7 @@ public:
 		auto cliTcp = even->tcpPtr; 
 		forwardRead.signal();
 
-		// cliTcp->lock();
-		int ret = cliTcp->tcpconnRead();
+		int ret = cliTcp->readOnce();
 		dbg("SIGNAL");
 
 		if(ret == 0){
@@ -58,7 +57,7 @@ public:
 			return NULL;
 		}
 		else if(ret == -1)return NULL;
-		// cliTcp->unlock();
+
 		dbg("READ LOOP END");
 		return NULL;
 	}
@@ -92,9 +91,8 @@ public:
 
 		forwardWrite.signal();
 
-		// cliTcp->lock();
-		int ret = cliTcp->tcpconnWrite();
-		// cliTcp->unlock();
+		int ret = cliTcp->doWrite();
+
 		dbg("WRITE LOOP END");
 		return NULL;
 	}
@@ -102,7 +100,7 @@ public:
 	const int getfd() const { return fd; }
 	const int operator*() const { return getfd(); }
 
-	int tcpconnRead() {
+	virtual int readOnce() {
 		char buffer[BUFSIZ];
 		while (1) {
 			memset(buffer, 0, sizeof(buffer));
@@ -114,7 +112,7 @@ public:
 			else if (readSize == 0) {
 				return 0;                    //close
 			}
-			else if (readSize == -1 && errno == EAGAIN) {
+			else if (errno == EWOULDBLOCK || errno == EAGAIN) {
 				return 1;
 			}
 			else {
@@ -126,13 +124,13 @@ public:
 		}
 	}
 
-	int tcpconnWrite() {
+	virtual int doWrite() {
 		dbg("WRITE-ACTION");
 		assert(fcntl(fd, F_GETFL));
 		char writeBuffer[BUFSIZ];
 
 		needWrite.timeWait(TIME_WAIT_SEC, 0);
-		int size = writeAction(writeBuffer, BUFSIZ, this); //error
+		int size = writeAction(writeBuffer, BUFSIZ, this); 
 
 		dbg("WRITE");
 		int writeSize = write(fd, writeBuffer, size);
@@ -140,6 +138,7 @@ public:
 		dbg("AFTER-WRITE");
 		return 0;
 	}
+
 	void lock(){
 		if(tcpLock.lock() != 0){
 			listMutex->unlock();

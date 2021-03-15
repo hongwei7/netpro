@@ -18,9 +18,9 @@
 #include "epoll.h"
 #include "dbg.h"
 
-const int DEFAULT_POOL_MIN = 5;
+const int DEFAULT_POOL_MIN = 50;
 const int DEFAULT_POOL_MAX = 1000;
-const int DEFAULT_TASK_NUM = 10;
+const int DEFAULT_TASK_NUM = 100;
 
 void defaultRead(char *buf, int size, tcpconn *wk)
 {

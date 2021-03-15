@@ -15,9 +15,8 @@ void httpRequest(char* buf, int size, tcpconn* wk){
     usleep(10000);
     wk->needWrite.signal();
 }
-
+char httpres[] = "HTTP/1.1 200 OK\r\nDate: Sat, 31 Dec 2005 23:59:59 GMT\r\nContent-Type: text/html;charset=ISO-8859-1\r\n\r\n<html><head><title>TEST</title></head><body>HELLO</body></html>\n";
 int httpResponse(char* buf, int size, tcpconn* wk){
-    char httpres[] = "HTTP/1.1 200 OK\r\nDate: Sat, 31 Dec 2005 23:59:59 GMT\r\nContent-Type: text/html;charset=ISO-8859-1\r\n\r\n<html><head><title>TEST</title></head><body>HELLO</body></html>\n";
     strcpy(buf, httpres);
     return sizeof(httpres);
 }
