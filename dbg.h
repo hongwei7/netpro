@@ -26,6 +26,8 @@ License (MIT):
 
 *****************************************************************************/
 
+//#define DBG_MACRO_DISABLE
+
 #ifndef DBG_MACRO_DBG_H
 #define DBG_MACRO_DBG_H
 

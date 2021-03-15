@@ -6,7 +6,6 @@
 
 const int SERVPORT = 9999;
 
-
 void httpRequest(char* buf, int size, tcpconn* wk){
     // std::cout << "----request-----" << std::endl;
     // std::cout << buf ;

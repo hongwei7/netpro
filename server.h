@@ -1,6 +1,7 @@
 #ifndef __NETPRO__SERVER__H
 #define __NETPRE__SERVER__H
 
+
 #include <sys/socket.h>
 #include <list>
 #include <map>
@@ -154,6 +155,9 @@ public:
         delete ev->sharedPtr;
     }
 
+    ~server(){
+        tcpMap.clear();
+    }
 
 
 private:

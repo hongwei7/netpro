@@ -35,6 +35,7 @@ class event {
 public:
     event(epoll* ep, int cli, T* wk, bool sock)
         : epollTree(ep), cliFd(cli), tcpPtr(wk), sharedPtr(new std::shared_ptr<event<T>>(this)){
+        memset(&event_impl, 0, sizeof(event_impl));
         if(sock) event_impl.events = EPOLLIN;
         else event_impl.events = EPOLLIN | EPOLLOUT | EPOLLET; 
         event_impl.data.fd = cli;
@@ -55,6 +56,7 @@ public:
         assert(ret == 0);
     }
     ~event(){
+        dbg("EVENT DECRACE");
         delete tcpPtr;
     }
 
