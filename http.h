@@ -17,7 +17,7 @@ enum LINE_STATUS { LINE_OK = 0, LINE_OPEN };
 
 class httpconn {
 
-private:
+public:
     char mReadBuf[READ_BUFFER_SIZE];               //储存请求报文数据
     int mReadIdx;                                  //缓冲区数据最后一个字节的下一个位置
     int mCheckedIdx;                               //已经读取的位置
@@ -48,8 +48,9 @@ public:
     HTTP_CODE parseContent(char* text) {}
     HTTP_CODE doRequest() {}
 
-    char* getLine(httpconn& http) { return http.mReadBuf + http.mStartLine; } //后移指针
-    LINE_STATUS parseLine() {};                     //分析请求报文的部分
+    char* getLine(httpconn& http) { return http.mReadBuf + http.mStartLine; }   //后移指针
+    LINE_STATUS parseLine() {};                                                 //分析请求报文的部分
+
 private:
     //doRequest 中的函数
     bool addResponse(const char* format, ...);
