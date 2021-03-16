@@ -37,7 +37,7 @@ public:
         : epollTree(ep), cliFd(cli), tcpPtr(wk), sharedPtr(new std::shared_ptr<event<T>>(this)){
         memset(&event_impl, 0, sizeof(event_impl));
         if(sock) event_impl.events = EPOLLIN;
-        else event_impl.events = EPOLLIN | EPOLLOUT | EPOLLET; 
+        else event_impl.events = EPOLLIN | EPOLLET; 
         event_impl.data.fd = cli;
         int ret = epoll_ctl(epollTree->getepfd(), EPOLL_CTL_ADD, cliFd, &event_impl);
         if (ret == -1) {
@@ -45,6 +45,11 @@ public:
             exit(-1);
         }
         assert(ret == 0);
+    }
+    void addWrite(){
+	    dbg("MOD EVENT");
+        event_impl.events |= EPOLLOUT;
+        assert(epoll_ctl(epollTree->getepfd(), EPOLL_CTL_MOD, cliFd, &event_impl) == 0);
     }
     const int getfd() const { return cliFd; }
     const int getEvent() const { return event_impl.events; }

@@ -14,19 +14,15 @@
 
 void* dealWithClientRead(void*);
 void* dealWithClientWrite(void*);
-void closeTcpconn(void*);
 
 const int TIME_WAIT_SEC = 5;
 
 class tcpconn : noncopyable {
 public:
 	tcpconn(int file): fd(file) { 
-		memset(&httpInfo, 0, sizeof(httpInfo));
 	} 
 
 	friend void* dealWithClientRead(void* cli_fd) {
-		// auto tcpMap = tcpMap;
-		// auto listMutex = listMutex;
 		int clifd = *((int*)cli_fd);
 		listMutex->lock();
 		auto iter = tcpMap->find(clifd);
@@ -65,8 +61,6 @@ public:
 	friend void* dealWithClientWrite(void* cli_fd){
 		dbg("DEALWITHCLIENT WRITE");
 		int clifd = *((int*)cli_fd);
-		// auto listMutex = listMutex;
-		// auto tcpMap = tcpMap;
 
 		listMutex->lock();
 		auto iter = tcpMap->find(clifd);
@@ -102,18 +96,16 @@ public:
 	const int operator*() const { return getfd(); }
 
 	int readOnce() {
-		char buffer[BUFSIZ];
 		while (1) {
-			char readBuf[BUFSIZ];
-			int readSize = read(fd, httpInfo.mReadBuf + httpInfo.mReadIdx, sizeof(buffer));
+			int readSize = read(fd, httpInfo.mReadBuf + httpInfo.mReadIdx, sizeof(httpInfo.mReadBuf));
 			httpInfo.mReadIdx += readSize;
 			dbg(readSize);
 			if (readSize > 0) {
-				break;
+				continue;
 			}
 			else if (readSize == 0) {
-				return 0;                    //close
-			}
+				return 0;  
+			}				
 			else if (errno == EWOULDBLOCK || errno == EAGAIN) {
 				break;
 			}
@@ -125,7 +117,6 @@ public:
 			}
 		}
 		process();
-		needWrite.signal();
 		return 1;
 	}
 
@@ -135,8 +126,10 @@ public:
 		if(needWrite.timeWait(TIME_WAIT_SEC, 0) == 1)return 0;
 		dbg("WRITE");
 		int writeSize = write(fd, httpInfo.mWriteBuf, httpInfo.bytesToSend);
+		httpInfo.bytesHaveSend += writeSize;
 		//assert(writeSize >= 0);
 		dbg("AFTER-WRITE");
+		closeConn();
 		return 0;
 	}
 
@@ -164,11 +157,33 @@ public:
 private:
 	void process() {
 		dbg("PROCESS");
+
+	 	HTTP_CODE readRet = dbg(httpInfo.processRead());
+		if(readRet == NO_REQUEST)return;           		//继续获取报文
+		dbg("PROCESS READ END");
+		// bool writeRet = httpInfo.processWrite();
+		// if(!writeRet)closeConn();
+		// else needWrite.signal();
+
 		char httpres[] = "HTTP/1.1 200 OK\r\nDate: Sat, 31 Dec 2005 23:59:59 GMT\r\nContent-Type: text/html;charset=ISO-8859-1\r\n\r\n<html><head><title>TEST</title></head><body>HELLO</body></html>\n";
-		printf("%s\n", httpInfo.mReadBuf);
 		strcpy(httpInfo.mWriteBuf, httpres);
 		httpInfo.bytesToSend = strlen(httpInfo.mWriteBuf) + 1;
+
+		// httpInfo.print();
+
+		listMutex->lock();
+		(*tcpMap)[fd]->addWrite();
+		listMutex->unlock();
+
+		needWrite.signal();
+		return;
 	};
+
+	void closeConn(){
+		listMutex->lock();
+		tcpMap->erase(fd);
+		listMutex->unlock();
+	}
 
 public:
 	static mutex* listMutex;
