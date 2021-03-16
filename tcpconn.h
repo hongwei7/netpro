@@ -129,7 +129,7 @@ public:
 		httpInfo.bytesHaveSend += writeSize;
 		//assert(writeSize >= 0);
 		dbg("AFTER-WRITE");
-		closeConn();
+		//closeConn();
 		return 0;
 	}
 
@@ -169,7 +169,7 @@ private:
 		strcpy(httpInfo.mWriteBuf, httpres);
 		httpInfo.bytesToSend = strlen(httpInfo.mWriteBuf) + 1;
 
-		// httpInfo.print();
+		httpInfo.print();
 
 		listMutex->lock();
 		(*tcpMap)[fd]->addWrite();
