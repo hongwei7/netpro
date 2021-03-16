@@ -62,7 +62,7 @@ public:
         assert(listen(sockfd, 128) == 0);
         tcpconn* sockTcp = new tcpconn (sockfd);
         auto ev = new event<tcpconn>(&epolltree, sockfd, sockTcp, true);
-        tcpMap[sockfd] = *ev->sharedPtr;
+        tcpMap[sockfd] = std::shared_ptr<event<tcpconn>>(ev);
     }
     void mainloop()
     {
@@ -127,8 +127,7 @@ public:
         // dbg(clifd);
         tcpconn* newcli = new tcpconn(clifd);
         auto ev = new event<tcpconn>(&epolltree, clifd, newcli, false);
-        tcpMap[clifd] = *ev->sharedPtr;
-        delete ev->sharedPtr;
+        tcpMap[clifd] = std::shared_ptr<event<tcpconn>>(ev);
     }
 
     ~server(){

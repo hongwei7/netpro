@@ -34,7 +34,7 @@ template<typename T>
 class event {
 public:
     event(epoll* ep, int cli, T* wk, bool sock)
-        : epollTree(ep), cliFd(cli), tcpPtr(wk), sharedPtr(new std::shared_ptr<event<T>>(this)){
+        : epollTree(ep), cliFd(cli), tcpPtr(wk){
         memset(&event_impl, 0, sizeof(event_impl));
         if(sock) event_impl.events = EPOLLIN;
         else event_impl.events = EPOLLIN | EPOLLET; 
@@ -67,7 +67,6 @@ public:
 
 public:
     T* tcpPtr;
-    std::shared_ptr<event<T>>* sharedPtr;
 
 private:
     struct epoll_event event_impl;
