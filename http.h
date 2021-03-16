@@ -106,7 +106,12 @@ public:
         return NO_REQUEST;
     }
 
-    bool processWrite(HTTP_CODE ret) {}
+    bool processWrite(HTTP_CODE ret) {
+        char httpres[] = "HTTP/1.1 200 OK\r\nDate: Sat, 31 Dec 2005 23:59:59 GMT\r\nContent-Type: text/html;charset=ISO-8859-1\r\n\r\n<html><head><title>TEST</title></head><body>HELLO</body></html>\n";
+		strcpy(mWriteBuf, httpres);
+		bytesToSend = strlen(mWriteBuf) + 1;
+        return true;
+    }
 
     void print(){
         dbg(mReadBuf, mReadIdx, mCheckedIdx, mStartLine);
