@@ -1,6 +1,6 @@
 # netpro
-epoll+ET触发模式+线程池实现Web服务器。 <img alt="Build Status" src="https://api.travis-ci.org/hongwei7/netpro.svg?branch=master">
-[<img alt="Build Status" src="https://travis-ci.org/rsp/travis-hello-cpp.svg?branch=master" height="40">][travis-url]
+<img alt="Build Status" src="https://api.travis-ci.org/hongwei7/netpro.svg?branch=master">
+epoll+ET触发模式+线程池实现Web服务器。 
 
 技术特点：
 - 采用Reactor模型和epoll的ET边缘触发模式，更充分发挥I/O复用模型的效率。
