@@ -186,6 +186,7 @@ private:
             mHost = text;
         }
         else printf("UNKNOWN HEADER: %s\n", text);
+        return GET_REQUEST;
         return NO_REQUEST;
     }
 
