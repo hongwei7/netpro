@@ -11,6 +11,7 @@
 #include "http.h"
 #include "epoll.h"
 #include "dbg.h"
+#include "sql.h"
 
 void* dealWithClientRead(void*);
 void* dealWithClientWrite(void*);
@@ -198,6 +199,7 @@ private:
 	int fd;
 	mutex tcpLock;
 	httpconn httpInfo;
+	SQL sql;
 };
 
 std::map<int, std::shared_ptr<event<tcpconn>>> * tcpconn::tcpMap = nullptr;
