@@ -34,7 +34,7 @@ public:
         return exist;
     }
 
-    bool createUser(const string& name, const string& password){
+    bool createUser(const string& name, const string& password) const {
         string checkSQL = "select id, name, password from Users where name = '" + name + "';";
         MYSQL_ROW row;
         MYSQL_RES* res = excute(checkSQL);
