@@ -41,7 +41,6 @@ public:
 
 		auto cliTcp = even->tcpPtr; 
 		forwardRead.signal();
-		cliTcp->lock();
 
 		int ret = cliTcp->readOnce();
 		dbg("SIGNAL");
@@ -52,16 +51,13 @@ public:
 			listMutex->lock();
 			tcpMap->erase(clifd);
 			listMutex->unlock();
-			cliTcp->unlock();
 
 			return NULL;
 		}
 		else if(ret == -1){
-			cliTcp->unlock();
 			return NULL;
 		}
 		dbg("READ LOOP END");
-		cliTcp->unlock();
 		return NULL;
 	}
 	friend void* dealWithClientWrite(void* cli_fd){
@@ -84,7 +80,6 @@ public:
 
 		auto cliTcp = even->tcpPtr; 
 
-		cliTcp->lock();
 
 		listMutex->lock();
 		tcpMap->erase(clifd);
@@ -93,7 +88,6 @@ public:
 		forwardWrite.signal();
 
 		int ret = cliTcp->doWrite();
-		cliTcp->unlock();
 
 		dbg("WRITE LOOP END");
 		return NULL;
