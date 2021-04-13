@@ -38,6 +38,12 @@ public:
     server(int port): sockfd(socket(AF_INET, SOCK_STREAM, 0)),
         pool(DEFAULT_POOL_MIN, DEFAULT_POOL_MAX, DEFAULT_TASK_NUM)
     {
+        //屏蔽sigpipe错误
+        sigset_t signal_mask;
+        sigemptyset (&signal_mask);  
+        sigaddset (&signal_mask, SIGPIPE);
+        int rc = pthread_sigmask (SIG_BLOCK, &signal_mask, NULL);
+        if (rc != 0) printf("block sigpipe error\n");
 
         tcpconn::tcpMap = &tcpMap;
         tcpconn::listMutex = &tcpconnsListMutex;
@@ -68,9 +74,6 @@ public:
     {
         while (true)
         {
-            // dbg("epoll wait");
-
-
             int ret = -1;
             while(ret == -1){
                 ret = epoll_wait(epolltree.getepfd(), epolltree.eventsList, MAX_CLIENTS, -1);
@@ -82,7 +85,7 @@ public:
 
             for (int i = 0; i < ret; ++i)
             {
-                dbg("deal with event");
+                dbg("DEAL WITH EVENT");
                 int clifd = epolltree.eventsList[i].data.fd;
                 if (clifd == sockfd){
                     dbg(clifd);
@@ -110,7 +113,6 @@ public:
                         tcpconn::forwardWrite.wait();
                     }
                     // dealWithClient((void*)&epolltree.eventsList[i]);
-                    dbg(sharedPtr.use_count());
                     dbg("MAIN LOOP END");
                 }
             }
@@ -130,8 +132,12 @@ public:
         tcpMap[clifd] = std::shared_ptr<event<tcpconn>>(ev);
     }
 
-    ~server(){
+    void destroy(){
         tcpMap.clear();
+    }
+
+    ~server(){
+        destroy();
     }
 
 

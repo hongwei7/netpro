@@ -198,7 +198,7 @@ private:
         }
         return NO_REQUEST;
     }
-    HTTP_CODE doRequest() {}
+    HTTP_CODE doRequest() {return NO_REQUEST;}
 
     char* getLine() { return mReadBuf + mStartLine; }   //后移指针
 
