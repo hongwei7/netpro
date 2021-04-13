@@ -11,7 +11,6 @@
 #include "http.h"
 #include "epoll.h"
 #include "dbg.h"
-#include "sql.h"
 
 void* dealWithClientRead(void*);
 void* dealWithClientWrite(void*);
@@ -113,7 +112,6 @@ public:
 			else {
 				perror("read");
 				dbg(errno);
-				unlock();
 				return -1;
 			}
 		}
@@ -134,19 +132,6 @@ public:
 		return 0;
 	}
 
-	void lock(){
-		if(tcpLock.lock() != 0){
-			listMutex->unlock();
-			unlock();
-			pthread_exit(NULL);
-		}
-	}
-	void unlock(){
-		if(tcpLock.unlock() != 0){
-			listMutex->unlock();
-			pthread_exit(NULL);
-		}
-	}
 	~tcpconn(){
 		listMutex->lock();
 		tcpMap->erase(fd);
@@ -191,9 +176,7 @@ public:
 
 private:
 	int fd;
-	mutex tcpLock;
 	httpconn httpInfo;
-	SQL sql;
 };
 
 std::map<int, std::shared_ptr<event<tcpconn>>> * tcpconn::tcpMap = nullptr;

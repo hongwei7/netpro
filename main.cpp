@@ -7,8 +7,6 @@
 const int SERVPORT = 9999;
 
 int main() {
-
-
     server ser(SERVPORT);
     ser.mainloop();
 }

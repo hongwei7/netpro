@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
+#include "sql.h"
 #include "dbg.h"
 
 static const int FILE_NAME_LEN = 200;
@@ -34,10 +35,11 @@ public:
         mWriteIdx = 0;
         cgi = 0;
 
-    memset(mReadBuf, '\0', READ_BUFFER_SIZE);
-    memset(mWriteBuf, '\0', WRITE_BUFFER_SIZE);
-    memset(mRealFile, '\0', FILE_NAME_LEN);
+        memset(mReadBuf, '\0', READ_BUFFER_SIZE);
+        memset(mWriteBuf, '\0', WRITE_BUFFER_SIZE);
+        memset(mRealFile, '\0', FILE_NAME_LEN);
     }
+
 public:
     char mReadBuf[READ_BUFFER_SIZE];               //储存请求报文数据
     int mReadIdx;                                  //缓冲区数据最后一个字节的下一个位置
@@ -60,6 +62,8 @@ public:
     char* mString;                                 //请求头数据
     int bytesToSend;
     int bytesHaveSend;
+
+    SQL sql;
 
 
 public:
