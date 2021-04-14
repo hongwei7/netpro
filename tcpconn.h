@@ -98,7 +98,7 @@ public:
 	int readOnce() {
 		while (1) {
 			int readSize = read(fd, httpInfo.mReadBuf + httpInfo.mReadIdx, sizeof(httpInfo.mReadBuf));
-			httpInfo.mReadIdx += readSize;
+			httpInfo.mReadIdx += readSize + 1;
 			dbg(readSize);
 			if (readSize > 0) {
 				continue;
@@ -148,8 +148,6 @@ private:
 		if(readRet == NO_REQUEST)return;           		//继续获取报文
 		dbg("PROCESS READ END");
 		bool writeRet = httpInfo.processWrite(readRet);
-
-		httpInfo.print();
 
 		listMutex->lock();
 		(*tcpMap)[fd]->addWrite();

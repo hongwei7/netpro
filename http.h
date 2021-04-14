@@ -68,11 +68,16 @@ public:
 
 public:
     HTTP_CODE processRead() {
+        //dbg(mReadBuf);
         LINE_STATUS lineStatus = LINE_OK;
         HTTP_CODE ret = NO_REQUEST;
         char* text = 0;
         
-        while((mCheckState == CHECK_STATE_CONTENT && lineStatus == LINE_OK )|| ((lineStatus = parseLine()) == LINE_OK)){
+        while(true){
+            if(mCheckState != CHECK_STATE_CONTENT || lineStatus != LINE_OK){
+                lineStatus = parseLine();
+                if(lineStatus != LINE_OK)break; 
+            }
 
             text = getLine();
             mStartLine = mCheckedIdx;
@@ -89,7 +94,8 @@ public:
                 case CHECK_STATE_HEADER: {
                     // dbg("CHECK_STATE_HEADER");
                     ret = parseHeaders(text);
-                    // dbg(ret);
+                    //dbg(ret == GET_REQUEST);
+                    //dbg(ret == NO_REQUEST);
                     if(ret == BAD_REQUEST)
                         return BAD_REQUEST;
                     else if(ret == GET_REQUEST)
@@ -97,8 +103,9 @@ public:
                     break;
                 }
                 case CHECK_STATE_CONTENT: {
-                    // dbg("CHECK_STATE_CONTENT");
+                    dbg("ENTER CHECK_STATE_CONTENT");
                     ret = parseContent(text);
+                    //dbg(mString);
                     // dbg(ret);
                     if(ret == GET_REQUEST)return doRequest();
                     lineStatus = LINE_OPEN;
@@ -107,13 +114,25 @@ public:
                 default: return INTERNAL_ERROR;
             }
         }
+        //print();
         return NO_REQUEST;
     }
 
     bool processWrite(HTTP_CODE ret) {
-        char httpres[] = "HTTP/1.1 200 OK\r\nDate: Thu, 16 Mar 2021 23:59:59 GMT\r\nContent-Type: text/html;charset=ISO-8859-1\r\n\r\n<html><head><title>TEST</title></head><body>HELLO</body></html>\n";
-		strcpy(mWriteBuf, httpres);
-		bytesToSend = strlen(mWriteBuf) + 1;
+        char badres[] = "HTTP/1.1 400 Bad Request\r\nDate: Thu, 16 Mar 2021 23:59:59 GMT\r\nContent-Type: text/html;charset=ISO-8859-1\r\n\r\n<html><head><title>ERROR</title></head><body>400 BAD REQUEST</body></html>\n";
+        char goodres[] = "HTTP/1.1 200 OK\r\nDate: Thu, 16 Mar 2021 23:59:59 GMT\r\nContent-Type: text/html;charset=ISO-8859-1\r\n\r\n<html><head><title>TEST</title></head><body>success</body></html>\n";
+        switch(ret){
+            case GET_REQUEST: 
+                if(mMethod == GET){
+                    strcpy(mWriteBuf, goodres);
+	                bytesToSend = strlen(mWriteBuf) + 1;
+                    break;
+                }
+                else break;
+            case BAD_REQUEST: strcpy(mWriteBuf, badres);
+	                          bytesToSend = strlen(mWriteBuf) + 1;
+                              break;
+        }
         return true;
     }
 
@@ -164,8 +183,12 @@ private:
     }
 
     HTTP_CODE parseHeaders(char* text) {
+        dbg(text);
+        //dbg(text[0] == '\0');
+
         if(text[0] == '\0'){
             if(mContentLength != 0){
+                dbg("ENTER CHECK_STATE_CONTENT");
                 mCheckState = CHECK_STATE_CONTENT;
                 return NO_REQUEST;
             }
@@ -179,7 +202,8 @@ private:
                 mLinger = true;
             }
         }
-        else if(strncasecmp(text, "Content-length:", 15) == 0){
+        else if(strncasecmp(text, "Content-Length:", 15) == 0){
+            //dbg("CHECK CONTENT LENGTH");
             text += 15;
             text += strspn(text, " \t");
             mContentLength = atol(text);
@@ -189,24 +213,62 @@ private:
             text += strspn(text, " \t");
             mHost = text;
         }
-        else printf("UNKNOWN HEADER: %s\n", text);
-        return GET_REQUEST;
+        else {
+            dbg("UNKNOWN HEADER");
+        }
         return NO_REQUEST;
     }
 
     HTTP_CODE parseContent(char* text) {
+        //dbg(mReadIdx >= mContentLength + mCheckedIdx);
+        //dbg(text + 1);
         if(mReadIdx >= (mContentLength + mCheckedIdx)){
-            text[mContentLength] = '\0';
-            mString = text;
+            text[mContentLength + 1] = '\0';
+            mString = text + 1;
             return GET_REQUEST;
         }
         return NO_REQUEST;
     }
-    HTTP_CODE doRequest() {return NO_REQUEST;}
+    HTTP_CODE doRequest() {
+        print();
+        if(mMethod == GET)return GET_REQUEST;
+
+        char *op, *username, *password;
+
+        //这里需要做格式检查
+        dbg("DO REQUEST");
+        if(strncasecmp(mString, "op=", 3) != 0)return BAD_REQUEST;
+        op = mString + 3;
+        mString = strchr(mString, '&');
+        *(mString++) = '\0';
+        if(strncasecmp(mString, "username=", 9) != 0)return BAD_REQUEST;
+        username = mString + 9;
+        mString = strchr(mString, '&');
+        *(mString++) = '\0';
+        if(strncasecmp(mString, "password=", 9) != 0)return BAD_REQUEST;
+        password = mString + 9;
+        dbg(op, username, password);
+
+        if(strcmp(op, "signin") == 0){
+            bool status = sql.checkUser(string(username), string(password));
+            if(!status)return BAD_REQUEST;
+        }
+        else if(strcmp(op, "signup") == 0){
+            bool status = sql.createUser(string(username), string(password));
+            if(!status)return BAD_REQUEST;
+        }
+        else return BAD_REQUEST;
+
+        char success[] = "HTTP/1.1 200 OK\r\nDate: Sat, 31 Dec 2005 23:59:59 GMT\r\nContent-Type: text/html;charset=ISO-8859-1\r\n\n";
+        strcpy(mWriteBuf, success);
+        bytesToSend = sizeof(success);
+        return GET_REQUEST;
+    }
 
     char* getLine() { return mReadBuf + mStartLine; }   //后移指针
 
     LINE_STATUS parseLine() {                           //分析请求报文的部分
+        //dbg(mReadIdx, mCheckedIdx);
         char temp;
         for(; mCheckedIdx < mReadIdx; ++mCheckedIdx){
             temp = mReadBuf[mCheckedIdx];
@@ -234,7 +296,7 @@ private:
     }
 
     //doRequest 中的函数
-    bool addResponse(const char* format, ...);
+    bool addResponse(const char* format);
     bool addContent(const char* content);
     bool addStatusLine(int status, const char* title);
     bool addHeaders(int contentLength);
