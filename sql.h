@@ -60,6 +60,7 @@ private:
         }
 
         MYSQL_RES* res = mysql_use_result(conn);
+        mysql_commit(conn);
         return res;
     }
 
