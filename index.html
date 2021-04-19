@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>netpro</title>
+        <script src="https://unpkg.com/vue"></script>
+    </head>
+    <body>
+        <div id="app">
+            <span v-bind:title = "message">
+                NETPRO TEST PAGE
+                <br>
+            </span>
+            <input v-model = "user">
+            <input v-model = "password">
+            <br>
+            <button v-on:click = "signin">SignIn</button>
+            <button v-on:click = "signup">SignUp</button>
+        </div>
+
+        <script>
+            var app = new Vue({
+                el: '#app',
+                data: {
+                    message: 'page loaded at ' + new Date().toLocaleString(),
+                    user: '',
+                    password: '',
+                    status: 'logout'
+                },
+                methods:{
+                    postMsg: function(op, username, password){
+                        var httpRequest = new XMLHttpRequest();
+                        httpRequest.open('POST', 'http://brucemarkdown.top:9999/', true); 
+                        httpRequest.setRequestHeader("Content-type","application/x-www-form-urlencoded");
+                        httpRequest.send('op='+op+'&username='+username+'&password='+password);
+                        httpRequest.onreadystatechange = function () {
+                            if (httpRequest.readyState == 4 && httpRequest.status == 200) {
+                                var json = httpRequest.responseText;
+                                alert(json);
+                            }
+                        };
+                    },
+                    checkValied: function(){
+                        if(this._data.user == '' || this._data.password == ''){
+                            alert("error input!");
+                            return false;
+                        }
+                        return true;
+                    },
+                    signin: function(){
+                        if(!this.checkValied())return;
+                        this.postMsg('signin', this._data.user, this._data.password);
+                    },
+                    signup: function(){
+                        if(!this.checkValied())return;
+                        this.postMsg('signup', this._data.user, this._data.password);
+                    }
+                }
+
+            })
+        </script>
+    </body>
+</html>

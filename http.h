@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <fstream>
+#include <iostream>
 #include "sql.h"
 #include "dbg.h"
 
@@ -120,13 +122,21 @@ public:
 
     bool processWrite(HTTP_CODE ret) {
         char badres[] = "HTTP/1.1 400 Bad Request\r\nDate: Thu, 16 Mar 2021 23:59:59 GMT\r\nContent-Type: text/html;charset=ISO-8859-1\r\n\r\n<html><head><title>ERROR</title></head><body>400 BAD REQUEST</body></html>\n";
-        char goodres[] = "HTTP/1.1 200 OK\r\nDate: Thu, 16 Mar 2021 23:59:59 GMT\r\nContent-Type: text/html;charset=ISO-8859-1\r\n\r\n<html><head><title>TEST</title></head><body>success</body></html>\n";
+        string goodres = "HTTP/1.1 200 OK\r\nDate: Thu, 16 Mar 2021 23:59:59 GMT\r\nContent-Type: text/html;charset=ISO-8859-1\r\n\r\n";
         switch(ret){
             case GET_REQUEST: 
                 if(mMethod == GET){
-                    strcpy(mWriteBuf, goodres);
+                    fetchContent(goodres);
+                    strcpy(mWriteBuf, goodres.c_str());
 	                bytesToSend = strlen(mWriteBuf) + 1;
                     break;
+                }
+                else if(mMethod == POST){
+                    goodres += retBuf;
+                    strcpy(mWriteBuf, goodres.c_str());
+	                bytesToSend = strlen(mWriteBuf) + 1;
+                    break;
+
                 }
                 else break;
             case BAD_REQUEST: strcpy(mWriteBuf, badres);
@@ -142,6 +152,17 @@ public:
     }
 
 private:
+    void fetchContent(string& goodres){
+        string content;
+        std::ifstream fs;
+        fs.open("index.html");
+        char ch;
+        while(fs.get(ch))
+            content.push_back(ch);
+        goodres += content + "\n";
+        dbg(goodres);
+    }
+
     HTTP_CODE parseRequestLine(char* text) {
         mUrl = strpbrk(text, " \t");                    //请求行中最先含有空格和\t任一字符的位置并返回
         
@@ -224,7 +245,7 @@ private:
         //dbg(text + 1);
         if(mReadIdx >= (mContentLength + mCheckedIdx)){
             text[mContentLength + 1] = '\0';
-            mString = text + 1;
+            mString = text;
             return GET_REQUEST;
         }
         return NO_REQUEST;
@@ -232,6 +253,7 @@ private:
     HTTP_CODE doRequest() {
         print();
         if(mMethod == GET)return GET_REQUEST;
+        if(mString == nullptr)return BAD_REQUEST;
 
         char *op, *username, *password;
 
@@ -251,17 +273,21 @@ private:
 
         if(strcmp(op, "signin") == 0){
             bool status = sql.checkUser(string(username), string(password));
-            if(!status)return BAD_REQUEST;
+            if(!status){
+                retBuf = "Failed";
+                return GET_REQUEST;
+            }
         }
         else if(strcmp(op, "signup") == 0){
             bool status = sql.createUser(string(username), string(password));
-            if(!status)return BAD_REQUEST;
+            if(!status){
+                retBuf = "Failed";
+                return GET_REQUEST;
+            }
         }
         else return BAD_REQUEST;
 
-        char success[] = "HTTP/1.1 200 OK\r\nDate: Sat, 31 Dec 2005 23:59:59 GMT\r\nContent-Type: text/html;charset=ISO-8859-1\r\n\n";
-        strcpy(mWriteBuf, success);
-        bytesToSend = sizeof(success);
+        retBuf = "OK";
         return GET_REQUEST;
     }
 
@@ -304,6 +330,8 @@ private:
     bool addContentLength();
     bool addLinger();
     bool addBlankLine();
+
+    string retBuf;
 };
 
 #endif
