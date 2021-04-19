@@ -11,10 +11,10 @@
                 <br>
             </span>
             <input v-model = "user">
-            <input v-model = "password">
+            <input type = 'password' v-model = "password">
             <br>
-            <button v-on:click = "signin">SignIn</button>
-            <button v-on:click = "signup">SignUp</button>
+            <button id = 'signin' v-on:click = "signin">SignIn</button>
+            <button id = 'signup' v-on:click = "signup">SignUp</button>
         </div>
 
         <script>
@@ -37,6 +37,8 @@
                                 var json = httpRequest.responseText;
                                 alert(json);
                             }
+                        document.getElementById("signin").disabled = false;
+                        document.getElementById("signup").disabled = false;
                         };
                     },
                     checkValied: function(){
@@ -48,10 +50,14 @@
                     },
                     signin: function(){
                         if(!this.checkValied())return;
+                        document.getElementById("signin").disabled = true;
+                        document.getElementById("signup").disabled = true;
                         this.postMsg('signin', this._data.user, this._data.password);
                     },
                     signup: function(){
                         if(!this.checkValied())return;
+                        document.getElementById("signin").disabled = true;
+                        document.getElementById("signup").disabled = true;
                         this.postMsg('signup', this._data.user, this._data.password);
                     }
                 }
