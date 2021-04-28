@@ -25,9 +25,9 @@ public:
 	friend void* dealWithClientRead(void* cli_fd) {
 		int clifd = *((int*)cli_fd);
 		listMutex->lock();
-		auto iter = tcpMap->find(clifd);
+		auto iter = connectMap->find(clifd);
 		std::shared_ptr<event<tcpconn>> even;
-		if(iter == tcpMap->end()){
+		if(iter == connectMap->end()){
 			listMutex->unlock();
 			forwardRead.signal();
 			return NULL;
@@ -48,7 +48,7 @@ public:
 			//关闭连接
 			dbg("CLIENT EXIT");
 			listMutex->lock();
-			tcpMap->erase(clifd);
+			connectMap->erase(clifd);
 			listMutex->unlock();
 
 			return NULL;
@@ -64,9 +64,9 @@ public:
 		int clifd = *((int*)cli_fd);
 
 		listMutex->lock();
-		auto iter = tcpMap->find(clifd);
+		auto iter = connectMap->find(clifd);
 		std::shared_ptr<event<tcpconn>> even;
-		if(iter == tcpMap->end()){
+		if(iter == connectMap->end()){
 			dbg("DEALWITHCLIENT WRITE OUT");
 			listMutex->unlock();
 			forwardWrite.signal();
@@ -81,7 +81,7 @@ public:
 
 
 		listMutex->lock();
-		tcpMap->erase(clifd);
+		connectMap->erase(clifd);
 		listMutex->unlock();
 
 		forwardWrite.signal();
@@ -134,7 +134,7 @@ public:
 
 	~tcpconn(){
 		listMutex->lock();
-		tcpMap->erase(fd);
+		connectMap->erase(fd);
 		dbg(close(fd));
 		listMutex->unlock();
 		dbg("------CONNECT OUT------");
@@ -150,7 +150,7 @@ private:
 		bool writeRet = httpInfo.processWrite(readRet);
 
 		listMutex->lock();
-		(*tcpMap)[fd]->addWrite();
+		(*connectMap)[fd]->addWrite();
 		listMutex->unlock();
 
 		needWrite.signal();
@@ -160,13 +160,13 @@ private:
 
 	void closeConn(){
 		listMutex->lock();
-		tcpMap->erase(fd);
+		connectMap->erase(fd);
 		listMutex->unlock();
 	}
 
 public:
 	static mutex* listMutex;
-	static std::map<int, std::shared_ptr<event<tcpconn>>> *tcpMap;
+	static std::map<int, std::shared_ptr<event<tcpconn>>> *connectMap;
 	static sem forwardRead, forwardWrite;
 	sem needWrite;
 	httpconn http;
@@ -177,7 +177,7 @@ private:
 	httpconn httpInfo;
 };
 
-std::map<int, std::shared_ptr<event<tcpconn>>> * tcpconn::tcpMap = nullptr;
+std::map<int, std::shared_ptr<event<tcpconn>>> * tcpconn::connectMap = nullptr;
 mutex* tcpconn::listMutex = nullptr;
 sem tcpconn::forwardRead, tcpconn::forwardWrite;
 

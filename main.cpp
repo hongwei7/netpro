@@ -7,6 +7,6 @@
 const int SERVPORT = 9999;
 
 int main() {
-    server ser(SERVPORT);
+    server<tcpconn> ser(SERVPORT);
     ser.mainloop();
 }

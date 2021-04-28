@@ -32,6 +32,7 @@ int setNonBlock(int sock)
     return ret;
 }
 
+template<typename ConnectType = tcpconn>
 class server
 {
 public:
@@ -45,8 +46,8 @@ public:
         int rc = pthread_sigmask (SIG_BLOCK, &signal_mask, NULL);
         if (rc != 0) printf("block sigpipe error\n");
 
-        tcpconn::tcpMap = &tcpMap;
-        tcpconn::listMutex = &tcpconnsListMutex;
+        ConnectType::connectMap = &connectMap;
+        ConnectType::listMutex = &ConnectTypesListMutex;
         assert(sockfd != 0);
         memset(&servAddr, 0, sizeof(servAddr));
         memset(&cliAddr, 0, sizeof(cliAddr));
@@ -66,9 +67,9 @@ public:
 
         assert(bind(sockfd, (sockaddr *)&servAddr, sizeof(servAddr)) == 0);
         assert(listen(sockfd, 128) == 0);
-        tcpconn* sockTcp = new tcpconn (sockfd);
-        auto ev = new event<tcpconn>(&epolltree, sockfd, sockTcp, true);
-        tcpMap[sockfd] = std::shared_ptr<event<tcpconn>>(ev);
+        ConnectType* sockTcp = new ConnectType (sockfd);
+        auto ev = new event<ConnectType>(&epolltree, sockfd, sockTcp, true);
+        connectMap[sockfd] = std::shared_ptr<event<ConnectType>>(ev);
     }
     void mainloop()
     {
@@ -93,24 +94,24 @@ public:
                 }
                 else
                 {
-                    tcpconnsListMutex.lock();
-                    auto iter = tcpMap.find(clifd);
-                    if(iter == tcpMap.end()){
+                    ConnectTypesListMutex.lock();
+                    auto iter = connectMap.find(clifd);
+                    if(iter == connectMap.end()){
                         dbg("-----");
-                        tcpconnsListMutex.unlock();
+                        ConnectTypesListMutex.unlock();
                         continue;
                     }
 
                     epolltree.eventsList[i];
-                    std::shared_ptr<event<tcpconn>> sharedPtr(iter->second);
-                    tcpconnsListMutex.unlock();
+                    std::shared_ptr<event<ConnectType>> sharedPtr(iter->second);
+                    ConnectTypesListMutex.unlock();
                     if(epolltree.eventsList[i].events & EPOLLIN){
                         pool.threadPoolAdd(dealWithClientRead, (void*) &clifd);
-                        tcpconn::forwardRead.wait();
+                        ConnectType::forwardRead.wait();
                     }
                     if(epolltree.eventsList[i].events & EPOLLOUT){
                         pool.threadPoolAdd(dealWithClientWrite, (void*) &clifd);
-                        tcpconn::forwardWrite.wait();
+                        ConnectType::forwardWrite.wait();
                     }
                     // dealWithClient((void*)&epolltree.eventsList[i]);
                     dbg("MAIN LOOP END");
@@ -127,13 +128,13 @@ public:
         assert(clifd > 0);
         setNonBlock(clifd);
         // dbg(clifd);
-        tcpconn* newcli = new tcpconn(clifd);
-        auto ev = new event<tcpconn>(&epolltree, clifd, newcli, false);
-        tcpMap[clifd] = std::shared_ptr<event<tcpconn>>(ev);
+        ConnectType* newcli = new ConnectType(clifd);
+        auto ev = new event<ConnectType>(&epolltree, clifd, newcli, false);
+        connectMap[clifd] = std::shared_ptr<event<ConnectType>>(ev);
     }
 
     void destroy(){
-        tcpMap.clear();
+        connectMap.clear();
     }
 
     ~server(){
@@ -145,8 +146,8 @@ private:
     int sockfd;
     struct sockaddr_in servAddr, cliAddr;
     epoll epolltree;
-    std::map<int, std::shared_ptr<event<tcpconn>>> tcpMap;
-    mutex tcpconnsListMutex;
+    std::map<int, std::shared_ptr<event<ConnectType>>> connectMap;
+    mutex ConnectTypesListMutex;
     threadPool pool;
 };
 
