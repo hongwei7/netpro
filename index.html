@@ -10,6 +10,8 @@
                 NETPRO TEST PAGE
                 <br>
             </span>
+            {{ message }}
+            <br>
             <input v-model = "user">
             <input type = 'password' v-model = "password">
             <br>
@@ -29,7 +31,7 @@
                 methods:{
                     postMsg: function(op, username, password){
                         var httpRequest = new XMLHttpRequest();
-                        httpRequest.open('POST', 'http://brucemarkdown.top:9999/', true); 
+                        httpRequest.open('POST', document.URL, true); 
                         httpRequest.setRequestHeader("Content-type","application/x-www-form-urlencoded");
                         httpRequest.send('op='+op+'&username='+username+'&password='+password);
                         httpRequest.onreadystatechange = function () {

@@ -1,11 +1,15 @@
 import requests
-import _thread as thread
+from threading import Thread
+from threading import Lock
 from tqdm import tqdm
 
 url = 'http://127.0.0.1:9999/'
 k = 100
+successAll = 0
+lock = Lock()
 
 def tryPost(logProcess = True):
+    global successAll
     success = 0
     d = {'op': 'signin', 'username': 'hongwei711q', 'password': '12356789'}
     p = range(k)
@@ -17,18 +21,23 @@ def tryPost(logProcess = True):
             success = success + 1
         except:
             pass
-    print(success, 'success')
+    #print(success, 'success')
+    lock.acquire()
+    successAll += success
+    lock.release()
 
 if __name__ == '__main__':
     print("需要创建多少线程:")
     n = int(input())
     k = 30
     show = False
+    queue = []
     for i in range(n):
         try:
-            thread.start_new_thread(tryPost, (show,))
+            queue.append(Thread(target = tryPost, args = (show,)))
+            queue[-1].start()
         except:
             print("unable to create threads.")
-    while 1:
-        pass
-
+    for ti in queue:
+        ti.join()
+    print('succeed:', successAll,'/', k * n)
