@@ -25,7 +25,7 @@ public:
     bool checkUser(const string& name, const string& password) const {
         string checkSQL = "select id, name, password from Users where name = '" + name + "' and password = '" + password + "';";
         MYSQL_ROW row;
-        MYSQL_RES* res = excute(checkSQL);
+        MYSQL_RES* res = execute(checkSQL);
         bool exist;
         row = mysql_fetch_row(res);
         if(!row)exist = false;
@@ -37,7 +37,7 @@ public:
     bool createUser(const string& name, const string& password) const {
         string checkSQL = "select id, name, password from Users where name = '" + name + "';";
         MYSQL_ROW row;
-        MYSQL_RES* res = excute(checkSQL);
+        MYSQL_RES* res = execute(checkSQL);
         bool exist;
         row = mysql_fetch_row(res);
         if(row){
@@ -47,7 +47,7 @@ public:
         mysql_free_result(res);
         string insertSQL = "insert into Users(name, password) values('" + name + "', '" + password + "');";
         // cout << insertSQL << endl;
-        res = excute(insertSQL);
+        res = execute(insertSQL);
         mysql_free_result(res);
         return true;
     }
