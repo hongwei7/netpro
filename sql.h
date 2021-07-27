@@ -53,7 +53,7 @@ public:
     }
 
 private:
-    MYSQL_RES* excute(const string& sql) const {
+    MYSQL_RES* execute(const string& sql) const {
         if (mysql_query(conn, sql.c_str())){
             fprintf(stderr, "%s\n", mysql_error(conn));
             exit(1);
