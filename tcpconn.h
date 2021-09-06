@@ -126,9 +126,7 @@ public:
 		dbg("WRITE");
 		int writeSize = write(fd, httpInfo.mWriteBuf, httpInfo.bytesToSend);
 		httpInfo.bytesHaveSend += writeSize;
-		//assert(writeSize >= 0);
 		dbg("AFTER-WRITE");
-		//closeConn();
 		return 0;
 	}
 
