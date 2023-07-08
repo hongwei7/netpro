@@ -1,5 +1,4 @@
 # netpro
-<img alt="Build Status" src="https://api.travis-ci.org/hongwei7/netpro.svg?branch=master">
 epoll+ET触发模式+线程池实现Web服务器。 
 
 技术特点：
